@@ -1,0 +1,25 @@
+# Python runtime artifacts
+**/.venv/
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.ruff_cache/
+**/.uv-cache/
+
+# Locally delivered SDK artifacts
+examples/python/wheelhouse/
+examples/python/dist/
+**/*.whl
+
+# CMake build trees
+examples/cpp/build*/
+
+# Example output and diagnostics
+**/*.log
+**/*.jsonl
+examples/python/captures/
+
+# Local tooling
+.DS_Store
+.idea/
+.vscode/
