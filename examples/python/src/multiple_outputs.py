@@ -16,7 +16,6 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
 
-
 _PRINT_LOCK = Lock()
 
 

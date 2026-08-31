@@ -12,34 +12,17 @@
 #include <iostream>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <system_error>
 #include <thread>
+#include <utility>
 
-int main(int argc, char** argv) {
+int main(int argc, char**) {
     try {
-        std::string package_id;
-        std::string port;
-        std::optional<qnbot::Side> selected_side;
-        for (int index = 1; index < argc; ++index) {
-            const std::string argument = argv[index];
-            if (argument == "--package-id" && ++index < argc) {
-                package_id = argv[index];
-            } else if (argument == "--port") {
-                port = example::require_value(argc, argv, index, argument);
-            } else if (argument == "--side") {
-                selected_side = example::parse_side(
-                    example::require_value(argc, argv, index, argument));
-            } else {
-                throw std::invalid_argument("unknown or incomplete argument: " +
-                                            argument);
-            }
-        }
-        if (package_id.empty()) {
-            throw std::invalid_argument("--package-id is required");
-        }
-        if (port.empty()) throw std::invalid_argument("--port is required");
-        if (!selected_side) throw std::invalid_argument("--side is required");
-        const auto side = *selected_side;
+        if (argc != 1)
+            throw std::invalid_argument(
+                "quick_start does not accept arguments");
+
         sigset_t wait_set;
         sigemptyset(&wait_set);
         sigaddset(&wait_set, SIGINT);
@@ -48,21 +31,12 @@ int main(int argc, char** argv) {
             throw std::runtime_error("failed to block process stop signals");
         }
 
-        qnbot::TargetConfig target;
-        target.type = qnbot::TargetType::hand;
-        target.name = example::default_target_name;
-        target.side = side;
-        target.source = qnbot::DeviceSelector{"glove", std::string("primary"),
-                                              std::nullopt};
-        target.algorithms = {qnbot::TargetAlgorithm{package_id}};
-
-        auto config = example::serial_config(port, side);
-        config.targets = {std::move(target)};
-        qnbot::Sdk sdk(config);
+        qnbot::SdkConfig config;
+        config.devices = {qnbot::GloveConfig{}};
+        qnbot::Sdk sdk(std::move(config));
         example::Cleanup cleanup;
         std::optional<qnbot::Glove> glove;
         std::optional<qnbot::Subscription> pose_subscription;
-        std::optional<qnbot::Subscription> output_subscription;
         std::mutex error_mutex;
         std::exception_ptr stop_error;
         std::atomic<bool> runner_finished{false};
@@ -72,20 +46,12 @@ int main(int argc, char** argv) {
             glove->connect();
             auto device = glove->device();
             auto pose = device.pose();
-            auto output = device.output();
             pose_subscription.emplace(pose.subscribe(
                 [](const qnbot::Sample<qnbot::GlovePose>& sample) {
                     std::cout
                         << "pose sequence=" << sample.sequence << " fingertips="
                         << sample.value.payload.fingertip_local.size() << '\n';
                 }));
-            output_subscription.emplace(output.subscribe(
-                [](const qnbot::Sample<qnbot::HandJointCommand>& sample) {
-                    std::cout << "retargeting sequence=" << sample.sequence
-                              << " joints=" << sample.value.joints.size()
-                              << '\n';
-                }));
-
             glove->start();
             coordinator = std::thread([&] {
                 for (;;) {

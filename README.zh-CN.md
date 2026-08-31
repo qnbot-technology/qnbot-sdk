@@ -20,7 +20,7 @@ python -m pip install qnbot-sdk-glove
 
 ## 安装 CLI 和目标手算法包
 
-运行需要目标手算法包的示例前，先安装 QnBot CLI 0.1.0，或产品交付说明指定的兼容版本。
+运行需要目标手算法包的示例前，先安装 QnBot CLI 0.1.1，或产品交付说明指定的兼容版本。
 
 macOS 或 Linux：
 

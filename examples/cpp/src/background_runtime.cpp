@@ -11,6 +11,10 @@ int main(int argc, char** argv) {
     try {
         const auto options = example::parse_serial_options(
             argc, argv, example::SerialExample::background);
+        if (options.validate_only) {
+            std::cout << "background runtime configuration valid\n";
+            return EXIT_SUCCESS;
+        }
         qnbot::Sdk sdk(example::runtime_config(options));
         example::Cleanup cleanup;
         std::optional<qnbot::Glove> glove;

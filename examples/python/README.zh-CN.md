@@ -13,7 +13,7 @@
 - 需要真实手套的示例所使用的受支持设备；
 - 需要目标手输出的示例所使用的算法包。
 
-需要目标手输出时，先安装 QnBot CLI 0.1.0，或产品交付说明指定的兼容版本。
+需要目标手输出时，先安装 QnBot CLI 0.1.1，或产品交付说明指定的兼容版本。
 
 macOS 或 Linux：
 
@@ -48,24 +48,26 @@ python -m pip install qnbot-sdk-glove
 
 ## 快速运行
 
-连接一只受支持的手套，并确认目标手算法包已经安装后运行：
+连接一只受支持的手套后直接运行：
 
 ```bash
-python src/quick_start.py --port /dev/ttyUSB0 --side left --package-id <package-id>
+python src/quick_start.py
 ```
 
-首次运行如出现标定提示，请按终端提示完成操作。成功后程序会持续输出姿态和目标手结果；
-按 `Ctrl+C` 停止。
+SDK 会自动发现唯一连接的手套并读取左右手信息。成功后程序会持续输出手套姿态；按
+`Ctrl+C` 停止。没有发现手套或同时发现多只手套时，程序会明确提示无法自动选择；请先运行
+`discover_gloves.py`，再参考需要显式设备参数的进阶示例。
 
 ## 示例列表
 
 | 示例 | 是否需要手套 | 是否需要目标手算法包 | 用途 |
 | --- | --- | --- | --- |
 | `discover_gloves.py` | 是 | 否 | 查看当前可用手套 |
-| `external_input.py` | 否 | 否 | 在后台调度中推入外部帧并订阅结果 |
+| `external_input_run_background.py` | 否 | 是 | 由应用提供手套帧，SDK 在后台持续处理 |
+| `external_input_manual_update.py` | 否 | 是 | 由应用提供手套帧，并在自己的循环中逐步处理 |
 | `skeleton.py` | 是 | 否 | 读取手部骨骼数据 |
-| `quick_start.py` | 是 | 是 | 最小目标手输出示例 |
-| `manual_runtime.py` | 是 | 是 | 在应用循环中主动更新 |
+| `quick_start.py` | 是 | 否 | 零参数读取单只手套姿态 |
+| `manual_runtime.py` | 是 | 是 | 由应用控制每次更新 |
 | `foreground_runtime.py` | 是 | 是 | 在当前线程持续运行 |
 | `background_runtime.py` | 是 | 是 | 在后台运行并主动停止 |
 | `async_runtime.py` | 是 | 是 | 使用 `asyncio` 异步读取输出 |
@@ -75,14 +77,15 @@ python src/quick_start.py --port /dev/ttyUSB0 --side left --package-id <package-
 | `haptics.py` | 是 | 否 | 设置并清除触觉反馈 |
 | `host_capture_calibration.py` | 是，两只 | 是 | 先完成左右手采集，再按算法包保存标定结果 |
 
-`external_input` 使用后台调度，应用只负责推入外部帧并通过订阅接收结果。
-需要由应用循环决定每一步调度时，使用 `manual_runtime` 显式调用 `update()`；两种运行方式不要混用。
+应用已有自己的数据源时，从两个 external input 示例中选择一种运行方式：普通应用可先使用
+后台示例；需要由应用循环决定每一步何时执行时，使用手动更新示例。两种方式都会接收应用
+提供的帧并输出目标手结果，不要在同一次运行中混用。
 
 ## 采集与标定
 
 普通目标手程序不需要自行编排采集或标定。选择算法包并启动后，SDK 会先复用当前操作员
 已有的兼容结果；缺少结果时，默认终端流程会显示算法包提供的动作提示，依次完成原始帧
-采集、标定计算、保存和激活，完成后才开始产生目标关节输出。
+采集、标定计算、保存和应用，完成后才开始产生目标关节输出。
 
 Capture 收集手套原始帧，Calibration 使用这些原始帧为选定算法包和 target 计算结果。
 需要重新计算但希望保留已有原始帧时，使用 `CalibrationConfig(force=True)`；需要连原始帧
@@ -98,9 +101,10 @@ GUI、ROS2 或远程程序可以使用 `external` 交互显示 SDK 的 prompt �
 
 ```bash
 python src/discover_gloves.py
-python src/external_input.py
+python src/external_input_run_background.py --package-id <package-id>
+python src/external_input_manual_update.py --package-id <package-id>
 python src/skeleton.py --port /dev/ttyUSB0 --side left
-python src/quick_start.py --port /dev/ttyUSB0 --side left --package-id <package-id>
+python src/quick_start.py
 python src/manual_runtime.py --port /dev/ttyUSB0 --side left --package-id <package-id> --updates 100
 python src/foreground_runtime.py --port /dev/ttyUSB0 --side left --package-id <package-id>
 python src/background_runtime.py --port /dev/ttyUSB0 --side left --package-id <package-id> --seconds 10
@@ -128,9 +132,8 @@ python src/host_capture_calibration.py --package-id <package-id> --force
 
 传入一个包时，采集后直接为该包完成标定；传入多个包时，SDK 合并这些包所需采集，
 采集完成后提示从已传入包中选择一个完成标定。后续加入新的 `--package-id <package-id>` 时，
-SDK 会把各 stage 标记为
-`reusable` 或 `needs_capture`。默认 `force=False`，可复用的采集结果不会重复采集；只需
-按提示补齐新候选实际需要的 stage。
+SDK 会复用仍然兼容的采集结果，只提示补齐新算法包缺少的动作。默认 `force=False`，
+不会重复已有的有效采集。
 
 Windows 请把串口参数替换为实际的 `COM` 端口，例如 `--port COM3`。
 
@@ -138,14 +141,14 @@ Windows 请把串口参数替换为实际的 `COM` 端口，例如 `--port COM3`
 
 - `--port`：手套串口；使用 `--port` 的参数化示例必须显式提供串口。
 - `--side`：手套物理侧，取值为 `left` 或 `right`。
-- `--package-id`：已经安装的目标手算法包 ID；需要目标输出的示例必须显式提供，该参数不会安装算法包。
+- `--package-id`：已经安装的目标手算法包 ID；使用算法包的示例必须显式传入，两个 external input 示例也不例外；该参数不会安装算法包。
 - `--force`：仅用于上位机两阶段示例；忽略可复用原始帧并完整重新采集，不表示持续采集。
 - `--target-name`：应用为输出指定的名称。
 
-`discover_gloves.py` 会自动发现设备并枚举结果。`quick_start.py` 和 `skeleton.py` 要求显式传入
-`--port` 与 `--side`，因此连接多只手套时也不会产生选择歧义。
+`quick_start.py` 使用 SDK 默认配置，不接收参数：它自动发现唯一连接的手套并输出姿态，
+不加载算法包。`discover_gloves.py` 用于查看当前设备；需要固定设备或使用多只手套时，
+请在相应进阶示例中显式传入 `--port` 与 `--side`。
 
-`quick_start.py` 和其他需要目标输出的示例都要求显式传入 `--package-id <package-id>`。
 `skeleton.py` 在 `connect()` 后、`start()` 前完成 `device.skeleton()` 配置；启动前重复配置
 是幂等的，设备启动后不能再新增该能力。
 

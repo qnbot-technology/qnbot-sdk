@@ -6,7 +6,6 @@ from threading import Lock
 from qnbot_sdk import Sample, Sdk, SerialConnection, Side
 from qnbot_sdk.glove import GloveConfig, HandJointCommand, HandSkeletonPose
 
-
 _PRINT_LOCK = Lock()
 
 
