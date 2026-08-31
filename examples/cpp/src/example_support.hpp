@@ -16,7 +16,6 @@ namespace example {
 constexpr double max_duration_seconds = 3600.0;
 constexpr std::uint64_t max_update_count = 1000000;
 constexpr const char* default_target_name = "openxr_hand";
-constexpr const char* default_package_id = "qnbot-dexhand";
 
 struct SerialOptions {
     std::string port;
@@ -25,10 +24,9 @@ struct SerialOptions {
     std::uint64_t updates{10};
     double hold{1.0};
     std::string target_name{default_target_name};
-    std::string package_id{default_package_id};
+    std::string package_id;
     bool package_id_explicit{false};
     bool validate_only{false};
-    bool external{false};
 };
 
 enum class SerialExample {
@@ -139,29 +137,18 @@ inline SerialOptions parse_serial_options(int argc, char** argv,
             options.package_id_explicit = true;
         } else if (argument == "--validate") {
             options.validate_only = true;
-        } else if (argument == "--external" &&
-                   example != SerialExample::haptics) {
-            options.external = true;
         } else {
             throw std::invalid_argument("unknown argument: " + argument);
         }
     }
-    if (options.external && !options.port.empty()) {
-        throw std::invalid_argument(
-            "--external and --port are mutually exclusive");
-    }
-    if (options.external && options.side) {
-        throw std::invalid_argument("--side cannot be used with --external");
-    }
-    if (options.external && options.package_id_explicit) {
-        throw std::invalid_argument(
-            "--package-id cannot be used with --external");
-    }
-    if (!options.external && options.port.empty()) {
+    if (options.port.empty()) {
         throw std::invalid_argument("--port is required");
     }
-    if (!options.external && !options.side) {
+    if (!options.side) {
         throw std::invalid_argument("--side is required with --port");
+    }
+    if (example != SerialExample::haptics && !options.package_id_explicit) {
+        throw std::invalid_argument("--package-id is required");
     }
     return options;
 }
@@ -180,15 +167,8 @@ inline qnbot::SdkConfig serial_config(const std::string& port,
 }
 
 inline qnbot::SdkConfig runtime_config(const SerialOptions& options) {
-    const auto side = options.external ? qnbot::Side::right : *options.side;
-    qnbot::SdkConfig config;
-    if (options.external) {
-        qnbot::GloveConfig glove{side, qnbot::ExternalConnection{}};
-        glove.name = "primary";
-        config.devices.push_back(glove);
-    } else {
-        config = serial_config(options.port, side);
-    }
+    const auto side = *options.side;
+    auto config = serial_config(options.port, side);
 
     qnbot::TargetConfig target;
     target.type = qnbot::TargetType::hand;
@@ -196,7 +176,7 @@ inline qnbot::SdkConfig runtime_config(const SerialOptions& options) {
     target.side = side;
     target.source =
         qnbot::DeviceSelector{"glove", std::string("primary"), std::nullopt};
-    if (!options.external) {
+    if (options.package_id_explicit) {
         target.algorithms = {qnbot::TargetAlgorithm{options.package_id}};
     }
     config.targets.push_back(std::move(target));

@@ -13,34 +13,61 @@
 - 需要真实手套的示例所使用的受支持设备；
 - 需要目标手输出的示例所使用的算法包。
 
-目标手算法包请按照产品交付说明，通过随产品提供的 CLI 安装。
+需要目标手输出时，先安装 QnBot CLI 0.1.1，或产品交付说明指定的兼容版本。
+
+macOS 或 Linux：
+
+```bash
+curl -fsSL https://get.qnbot.com/cli | bash
+```
+
+Windows PowerShell：
+
+```powershell
+irm https://get.qnbot.com/cli.ps1 | iex
+```
+
+安装产品交付的算法包并确认安装结果：
+
+```bash
+qnbot --version
+qnbot algorithm install ./package.zip
+qnbot algorithm list
+```
+
+将 `./package.zip` 替换为与当前操作系统、CPU 架构和 SDK 版本匹配的算法包文件。
 
 ## 安装
 
 ```bash
-pip install qnbot-sdk-glove
+python -m pip install qnbot-sdk-glove
 ```
+
+也可以从 [GitHub Releases](https://github.com/qnbot-technology/qnbot-sdk/releases)
+下载与当前平台匹配的 wheel。
 
 ## 快速运行
 
-连接一只受支持的手套，并确认目标手算法包已经安装后运行：
+连接一只受支持的手套后直接运行：
 
 ```bash
 python src/quick_start.py
 ```
 
-首次运行如出现标定提示，请按终端提示完成操作。成功后程序会持续输出姿态和目标手结果；
-按 `Ctrl+C` 停止。
+SDK 会自动发现唯一连接的手套并读取左右手信息。成功后程序会持续输出手套姿态；按
+`Ctrl+C` 停止。没有发现手套或同时发现多只手套时，程序会明确提示无法自动选择；请先运行
+`discover_gloves.py`，再参考需要显式设备参数的进阶示例。
 
 ## 示例列表
 
 | 示例 | 是否需要手套 | 是否需要目标手算法包 | 用途 |
 | --- | --- | --- | --- |
 | `discover_gloves.py` | 是 | 否 | 查看当前可用手套 |
-| `external_input.py` | 否 | 否 | 使用外部输入检查基本数据流程 |
+| `external_input_run_background.py` | 否 | 是 | 由应用提供手套帧，SDK 在后台持续处理 |
+| `external_input_manual_update.py` | 否 | 是 | 由应用提供手套帧，并在自己的循环中逐步处理 |
 | `skeleton.py` | 是 | 否 | 读取手部骨骼数据 |
-| `quick_start.py` | 是 | 是 | 最小目标手输出示例 |
-| `manual_runtime.py` | 是 | 是 | 在应用循环中主动更新 |
+| `quick_start.py` | 是 | 否 | 零参数读取单只手套姿态 |
+| `manual_runtime.py` | 是 | 是 | 由应用控制每次更新 |
 | `foreground_runtime.py` | 是 | 是 | 在当前线程持续运行 |
 | `background_runtime.py` | 是 | 是 | 在后台运行并主动停止 |
 | `async_runtime.py` | 是 | 是 | 使用 `asyncio` 异步读取输出 |
@@ -48,35 +75,106 @@ python src/quick_start.py
 | `multiple_outputs.py` | 是 | 是 | 从一只手套读取多路目标输出 |
 | `device_lifecycle.py` | 是，两只 | 是 | 分别管理左右手设备 |
 | `haptics.py` | 是 | 否 | 设置并清除触觉反馈 |
+| `host_capture_calibration.py` | 是，两只 | 是 | 先完成左右手采集，再按算法包保存标定结果 |
+
+应用已有自己的数据源时，从两个 external input 示例中选择一种运行方式：普通应用可先使用
+后台示例；需要由应用循环决定每一步何时执行时，使用手动更新示例。两种方式都会接收应用
+提供的帧并输出目标手结果，不要在同一次运行中混用。
+
+## 采集与标定
+
+普通目标手程序不需要自行编排采集或标定。选择算法包并启动后，SDK 会先复用当前操作员
+已有的兼容结果；缺少结果时，默认终端流程会显示算法包提供的动作提示，依次完成原始帧
+采集、标定计算、保存和应用，完成后才开始产生目标关节输出。
+
+Capture 收集手套原始帧，Calibration 使用这些原始帧为选定算法包和 target 计算结果。
+需要重新计算但希望保留已有原始帧时，使用 `CalibrationConfig(force=True)`；需要连原始帧
+也重新采集时，使用 `CaptureConfig(force=True)`。两个 `force` 都只影响对应阶段，不表示
+持续采集或每帧重新标定。
+
+GUI、ROS2 或远程程序可以使用 `external` 交互显示 SDK 的 prompt 和进度，并将当前
+`request_id` 原样传给 `confirm()`、`skip()` 或 `cancel()`；应用不自行实现阶段顺序、
+采样、计算或保存。只有“先采集、后选择算法包”的上位机业务，才需要运行
+`host_capture_calibration.py` 的独立两阶段流程。
 
 ## 常用命令
 
 ```bash
 python src/discover_gloves.py
-python src/external_input.py
-python src/skeleton.py
+python src/external_input_run_background.py --package-id <package-id>
+python src/external_input_manual_update.py --package-id <package-id>
+python src/skeleton.py --port /dev/ttyUSB0 --side left
 python src/quick_start.py
-python src/manual_runtime.py --port /dev/ttyUSB0 --side left --updates 100
-python src/foreground_runtime.py --port /dev/ttyUSB0 --side left
-python src/background_runtime.py --port /dev/ttyUSB0 --side left --seconds 10
-python src/async_runtime.py --port /dev/ttyUSB0 --side left --samples 10
-python src/debug_trace.py --port /dev/ttyUSB0 --side left --detail full --sample-rate 10
-python src/multiple_outputs.py --port /dev/ttyUSB0 --side left --package-id qnbot-dexhand
-python src/device_lifecycle.py --left-port /dev/ttyUSB0 --right-port /dev/ttyUSB1 --updates 10
+python src/manual_runtime.py --port /dev/ttyUSB0 --side left --package-id <package-id> --updates 100
+python src/foreground_runtime.py --port /dev/ttyUSB0 --side left --package-id <package-id>
+python src/background_runtime.py --port /dev/ttyUSB0 --side left --package-id <package-id> --seconds 10
+python src/async_runtime.py --port /dev/ttyUSB0 --side left --package-id <package-id> --samples 10
+python src/debug_trace.py --port /dev/ttyUSB0 --side left --package-id <package-id> --detail full --sample-rate 10
+python src/multiple_outputs.py --port /dev/ttyUSB0 --side left --package-id <package-id>
+python src/device_lifecycle.py --left-port /dev/ttyUSB0 --right-port /dev/ttyUSB1 --package-id <package-id> --updates 10
 python src/haptics.py --port /dev/ttyUSB0 --side left --hold 1
+python src/host_capture_calibration.py --package-id <package-id>
 ```
+
+首次采集时可以同时评估多个候选算法包：
+
+```bash
+python src/host_capture_calibration.py \
+  --package-id <package-id-1> \
+  --package-id <package-id-2>
+```
+
+需要忽略可复用原始帧并完整重采左右手时，显式增加 `--force`：
+
+```bash
+python src/host_capture_calibration.py --package-id <package-id> --force
+```
+
+传入一个包时，采集后直接为该包完成标定；传入多个包时，SDK 合并这些包所需采集，
+采集完成后提示从已传入包中选择一个完成标定。后续加入新的 `--package-id <package-id>` 时，
+SDK 会复用仍然兼容的采集结果，只提示补齐新算法包缺少的动作。默认 `force=False`，
+不会重复已有的有效采集。
 
 Windows 请把串口参数替换为实际的 `COM` 端口，例如 `--port COM3`。
 
 ## 参数说明
 
-- `--port`：手套串口；省略时由示例自动发现设备。
+- `--port`：手套串口；使用 `--port` 的参数化示例必须显式提供串口。
 - `--side`：手套物理侧，取值为 `left` 或 `right`。
-- `--package-id`：已经安装的目标手算法包 ID，例如 `qnbot-dexhand`；该参数不会安装算法包。
+- `--package-id`：已经安装的目标手算法包 ID；使用算法包的示例必须显式传入，两个 external input 示例也不例外；该参数不会安装算法包。
+- `--force`：仅用于上位机两阶段示例；忽略可复用原始帧并完整重新采集，不表示持续采集。
 - `--target-name`：应用为输出指定的名称。
 
-`quick_start.py` 使用默认算法包 ID。如需使用交付给你的其他算法包，请修改示例中的
-`TARGET_PACKAGE_ID`，或在支持该参数的示例中传入 `--package-id`。
+`quick_start.py` 使用 SDK 默认配置，不接收参数：它自动发现唯一连接的手套并输出姿态，
+不加载算法包。`discover_gloves.py` 用于查看当前设备；需要固定设备或使用多只手套时，
+请在相应进阶示例中显式传入 `--port` 与 `--side`。
+
+`skeleton.py` 在 `connect()` 后、`start()` 前完成 `device.skeleton()` 配置；启动前重复配置
+是幂等的，设备启动后不能再新增该能力。
+
+`host_capture_calibration.py` 使用 SDK 默认 operator 和 `openxr_hand` 目标保存标定，结果可由
+其他目标输出示例直接复用。采集确认可输入 `y`、`yes`、`confirm` 或直接按 Enter。
+
+### Receiver、重连与终端输出
+
+现有 `discover_gloves.py`、`device_lifecycle.py`、`skeleton.py` 以及其他读取 pose、status 和 Skeleton
+的按 side 示例同样适用于受支持的无线 Receiver，不需要专用配置。左右手声明可以显式选择
+同一个 Receiver 串口；若其中一只已配置手套在首次连接时离线，其他在线手套仍可使用，
+但离线 source 及其关联输出不会加入当前 SDK 实例，打开离线手套后需要重新创建 SDK。
+Receiver 不提供 haptics；需要触觉反馈时请使用提供 haptics 的直连手套。
+
+已经成功连接的 source 后续断连时会自动恢复。恢复期间状态为 `connected=false`、
+`stale=true` 并保留 `last_error`，成功后 `reconnect_count` 增加；已启动 source 恢复 telemetry 后 `stale=false`，
+尚未 start 的 source 仍为 `stale=true`。在提供 haptics 的直连手套上，`haptics.py` 示例在
+断连期间发送命令会立即失败，不排队、不重放；恢复后需要重新设置 haptics。
+
+`foreground_runtime.py` 等使用内置终端的示例只在交互式 TTY 中显示颜色。设置
+`NO_COLOR` 或在非 TTY、pipe、重定向环境运行时输出纯文本；Debug 和 diagnostic JSON
+始终不包含 ANSI 转义序列。
+
+## 生命周期与 Debug 排障
+
+SDK 实例退出前应停止已启动的设备；需要重新纳入首次连接时离线的 source 时，请重新创建 SDK。
 
 ## 常见问题
 

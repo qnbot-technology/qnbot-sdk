@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+from threading import Lock
 
 from qnbot_sdk import (
     DeviceSelector,
@@ -15,7 +16,7 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
 
-DEFAULT_PACKAGE_ID = "qnbot-dexhand"
+_PRINT_LOCK = Lock()
 
 
 def create_sdk(
@@ -53,10 +54,11 @@ def create_sdk(
 
 def print_output(name: str) -> Callable[[Sample[HandJointCommand]], None]:
     def show(sample: Sample[HandJointCommand]) -> None:
-        print(
-            f"callback {name} sequence={sample.sequence} "
-            f"target={sample.value.target} joints={sample.value.joints}"
-        )
+        with _PRINT_LOCK:
+            print(
+                f"callback {name} sequence={sample.sequence} "
+                f"target={sample.value.target} joints={sample.value.joints}"
+            )
 
     return show
 
@@ -74,7 +76,7 @@ def main() -> None:
     )
     arguments.add_argument(
         "--package-id",
-        default=DEFAULT_PACKAGE_ID,
+        required=True,
         help="Installed algorithm package ID used by both output instances",
     )
     options = arguments.parse_args()

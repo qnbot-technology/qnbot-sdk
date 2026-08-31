@@ -17,6 +17,10 @@ int main(int argc, char** argv) {
     try {
         const auto options = example::parse_serial_options(
             argc, argv, example::SerialExample::foreground);
+        if (options.validate_only) {
+            std::cout << "foreground runtime configuration valid\n";
+            return EXIT_SUCCESS;
+        }
         sigset_t wait_set;
         if (!options.validate_only) {
             sigemptyset(&wait_set);

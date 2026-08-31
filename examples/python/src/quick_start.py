@@ -1,14 +1,9 @@
 from __future__ import annotations
 
-from qnbot_sdk import (
-    Sample,
-    Sdk,
-    TargetAlgorithm,
-    TargetConfig,
-)
-from qnbot_sdk.glove import GloveConfig, GlovePose, HandJointCommand
+import sys
 
-TARGET_PACKAGE_ID = "qnbot-dexhand"
+from qnbot_sdk import Sample, Sdk
+from qnbot_sdk.glove import GloveConfig, GlovePose
 
 
 def print_pose(sample: Sample[GlovePose]) -> None:
@@ -18,30 +13,17 @@ def print_pose(sample: Sample[GlovePose]) -> None:
     )
 
 
-def print_output(sample: Sample[HandJointCommand]) -> None:
-    print(
-        f"retargeting sequence={sample.sequence} "
-        f"target={sample.value.target} joints={sample.value.joints}"
-    )
-
-
 def main() -> None:
-    sdk = Sdk(
-        devices=(GloveConfig(),),
-        targets=(
-            TargetConfig(
-                algorithms=(TargetAlgorithm(TARGET_PACKAGE_ID),),
-            ),
-        ),
-    )
+    if len(sys.argv) != 1:
+        raise SystemExit("quick_start does not accept arguments")
+
+    sdk = Sdk(devices=(GloveConfig(),))
     glove = sdk.glove()
     try:
         glove.connect()
         device = glove.device()
         pose = device.pose()
-        output = device.output()
         pose.subscribe(print_pose)
-        output.subscribe(print_output)
 
         glove.start()
 
