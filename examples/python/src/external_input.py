@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import time
+import threading
 
 from qnbot_sdk import (
     DeviceSelector,
@@ -43,10 +43,6 @@ def print_pose(sample: Sample[GlovePose]) -> None:
     print(f"pose callback sequence={sample.sequence}")
 
 
-def print_output(sample: Sample[HandJointCommand]) -> None:
-    print(f"pass-through output callback sequence={sample.sequence}")
-
-
 def main() -> None:
     sdk = Sdk(
         devices=[
@@ -66,30 +62,36 @@ def main() -> None:
     device = glove.device()
     pose = device.pose()
     output = device.output(name="hand")
+    output_ready = threading.Event()
+
+    def print_output(sample: Sample[HandJointCommand]) -> None:
+        print(f"pass-through output callback sequence={sample.sequence}")
+        output_ready.set()
+
     pose.subscribe(print_pose)
     output.subscribe(print_output)
     try:
         device.start()
-        for step in range(1, 4):
-            current = device.push_frame(frame(step))
-            print(f"pushed pose sequence={current.meta.sequence}")
-            glove.update()
+        glove.run_background()
+        try:
+            for step in range(1, 4):
+                current = device.push_frame(frame(step))
+                print(f"pushed pose sequence={current.meta.sequence}")
 
-        latest_pose = pose.latest()
-        latest_output = output.latest()
-        deadline = time.monotonic() + 1.0
-        while latest_output is None and time.monotonic() < deadline:
-            update = glove.update()
-            if update.has_next_task:
-                update.sleep()
+            if not output_ready.wait(timeout=1.0):
+                raise RuntimeError("external input did not publish pass-through output")
+            latest_pose = pose.latest()
             latest_output = output.latest()
-        if latest_pose is None or latest_output is None:
-            raise RuntimeError(
-                "external input did not publish pose and pass-through output"
-            )
-        print(f"latest pose sequence={latest_pose.sequence}")
-        print(f"latest pass-through output sequence={latest_output.sequence}")
-        print("external input complete")
+            if latest_pose is None or latest_output is None:
+                raise RuntimeError(
+                    "external input did not publish pose and pass-through output"
+                )
+            print(f"latest pose sequence={latest_pose.sequence}")
+            print(f"latest pass-through output sequence={latest_output.sequence}")
+            print("external input complete")
+        finally:
+            glove.request_stop()
+            glove.join()
     finally:
         glove.close()
 

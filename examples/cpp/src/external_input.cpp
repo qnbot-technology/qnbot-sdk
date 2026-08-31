@@ -9,7 +9,6 @@
 #include <iostream>
 #include <optional>
 #include <system_error>
-#include <thread>
 
 namespace {
 
@@ -51,8 +50,11 @@ int main(int argc, char** argv) {
         example::Cleanup cleanup;
         std::optional<qnbot::Glove> glove;
         example::PoseCallbackState pose_callback;
+        example::PoseCallbackState output_callback;
         std::optional<qnbot::Subscription> pose_subscription;
+        std::optional<qnbot::Subscription> output_subscription;
         std::optional<qnbot::Subscription> status_subscription;
+        bool runner_started = false;
         try {
             glove.emplace(sdk.glove());
             glove->connect();
@@ -66,6 +68,10 @@ int main(int argc, char** argv) {
                 [&](const qnbot::Sample<qnbot::GlovePose>& sample) {
                     pose_callback.notify(sample.sequence);
                 }));
+            output_subscription.emplace(output.subscribe(
+                [&](const qnbot::Sample<qnbot::HandJointCommand>& sample) {
+                    output_callback.notify(sample.sequence);
+                }));
             status_subscription.emplace(status.subscribe(
                 [](const qnbot::Sample<qnbot::GloveStatus>& sample) {
                     std::cout << "status connected=" << sample.value.connected
@@ -73,6 +79,8 @@ int main(int argc, char** argv) {
                 }));
 
             device.start();
+            glove->run_background();
+            runner_started = true;
 
             auto next_pose = pose.next();
             const auto pushed = device.push_frame(frame(1));
@@ -93,29 +101,25 @@ int main(int argc, char** argv) {
 
             for (std::uint64_t step = 2; step <= 4; ++step) {
                 static_cast<void>(device.push_frame(frame(step)));
-                const auto update = glove->update();
-                if (update.has_next_task()) static_cast<void>(update.sleep());
             }
 
             const auto deadline =
                 std::chrono::steady_clock::now() + std::chrono::seconds(2);
-            auto latest_output = output.latest();
-            while (!latest_output &&
-                   std::chrono::steady_clock::now() < deadline) {
-                const auto update = glove->update();
-                if (update.has_next_task()) static_cast<void>(update.sleep());
-                latest_output = output.latest();
+            if (!pose_callback.wait_until(deadline)) {
+                throw std::runtime_error(
+                    "pose subscription did not receive data");
+            }
+            if (!output_callback.wait_until(deadline)) {
+                throw std::runtime_error(
+                    "output subscription did not receive data");
             }
 
             const auto latest_pose = pose.latest();
             const auto latest_status = status.latest();
+            const auto latest_output = output.latest();
             if (!latest_pose || !latest_status || !latest_output) {
                 throw std::runtime_error(
                     "external input did not publish all expected data");
-            }
-            if (!pose_callback.wait_until(deadline)) {
-                throw std::runtime_error(
-                    "pose subscription did not receive data");
             }
             const auto callback_sequence = pose_callback.sequence();
             if (callback_sequence == 0) {
@@ -140,10 +144,18 @@ int main(int argc, char** argv) {
                       << " output sequence=" << latest_output->sequence
                       << " callback sequence=" << callback_sequence
                       << " health=" << health.ok << '\n';
+            glove->request_stop();
+            glove->join();
+            runner_started = false;
         } catch (...) {
             cleanup.capture_current("external input");
         }
 
+        if (runner_started && glove) {
+            cleanup.run("glove.request_stop()",
+                        [&] { glove->request_stop(); });
+            cleanup.run("glove.join()", [&] { glove->join(); });
+        }
         if (glove) {
             cleanup.run("glove.close()", [&] { glove->close(); });
         }

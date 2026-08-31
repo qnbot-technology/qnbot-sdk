@@ -62,7 +62,7 @@ python src/quick_start.py --port /dev/ttyUSB0 --side left --package-id <package-
 | 示例 | 是否需要手套 | 是否需要目标手算法包 | 用途 |
 | --- | --- | --- | --- |
 | `discover_gloves.py` | 是 | 否 | 查看当前可用手套 |
-| `external_input.py` | 否 | 否 | 使用外部输入检查基本数据流程 |
+| `external_input.py` | 否 | 否 | 在后台调度中推入外部帧并订阅结果 |
 | `skeleton.py` | 是 | 否 | 读取手部骨骼数据 |
 | `quick_start.py` | 是 | 是 | 最小目标手输出示例 |
 | `manual_runtime.py` | 是 | 是 | 在应用循环中主动更新 |
@@ -74,6 +74,9 @@ python src/quick_start.py --port /dev/ttyUSB0 --side left --package-id <package-
 | `device_lifecycle.py` | 是，两只 | 是 | 分别管理左右手设备 |
 | `haptics.py` | 是 | 否 | 设置并清除触觉反馈 |
 | `host_capture_calibration.py` | 是，两只 | 是 | 先完成左右手采集，再按算法包保存标定结果 |
+
+`external_input` 使用后台调度，应用只负责推入外部帧并通过订阅接收结果。
+需要由应用循环决定每一步调度时，使用 `manual_runtime` 显式调用 `update()`；两种运行方式不要混用。
 
 ## 采集与标定
 
