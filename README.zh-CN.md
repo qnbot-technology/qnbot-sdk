@@ -16,7 +16,7 @@ python -m pip install qnbot-sdk-glove
 | 语言 | 安装包 | 示例说明 |
 | --- | --- | --- |
 | Python | 通过 PyPI 安装 [qnbot-sdk-glove](https://pypi.org/project/qnbot-sdk-glove/) | [Python 示例](examples/python/README.zh-CN.md) |
-| C++ | 从 [Releases](https://github.com/qnbot-technology/qnbot-sdk/releases) 下载当前平台匹配的 Core 和 Glove C++ 包 | [C++ 示例](examples/cpp/README.zh-CN.md) |
+| C++ | 从 [Releases](https://github.com/qnbot-technology/qnbot-sdk/releases) 下载当前平台匹配的 QnBot C++ SDK/Glove 交付包 | [C++ 示例](examples/cpp/README.zh-CN.md) |
 
 ## 安装 CLI 和目标手算法包
 

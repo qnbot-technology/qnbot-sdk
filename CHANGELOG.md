@@ -9,7 +9,7 @@
 ## 1.1.0 - 2026-08-30
 
 - 示例与 SDK 1.1.0 的独立采集、校准和运行流程保持一致。
-- 安装说明增加 Linux ARM64 交付平台，并明确 Core 要求 glibc 2.34+、Glove 当前要求 glibc 2.38+。
+- 安装说明增加 Linux ARM64 交付平台，并明确 Glove 当前要求 glibc 2.38+。
 - 所有目标输出示例都要求客户显式传入 `--package-id`；采集与标定示例使用同一个可重复参数，不提供默认算法包。
 
 ## 1.0.0 - 2026-08-25
@@ -19,4 +19,4 @@
 - 增加公开 QnBot SDK 示例仓库结构。
 - 增加 Python 和 C++ Glove SDK 客户示例。
 - 目标手算法包通过 QnBot CLI 安装，示例使用已安装算法包的 package ID。
-- Core 和 Glove 的稳定版及候选版安装包通过 GitHub Releases 提供。
+- QnBot SDK 的稳定版及候选版安装包通过 GitHub Releases 提供。

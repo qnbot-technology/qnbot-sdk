@@ -10,12 +10,13 @@
 
 - CMake 3.16 或更高版本；
 - 支持 C++17 的编译器；`async_runtime` 需要 C++20；
-- 当前操作系统和 CPU 架构匹配的 Core、Glove C++ 包；
+- 当前操作系统和 CPU 架构匹配的 QnBot C++ SDK/Glove 交付包；
 - 需要真实手套的示例所使用的受支持设备；
 - 需要目标手输出的示例所使用的算法包。
 
 请从 [GitHub Releases](https://github.com/qnbot-technology/qnbot-sdk/releases)
-下载相互兼容的 Core 和 Glove C++ 包。需要目标手输出时，先安装 QnBot CLI 0.1.0，或
+下载当前平台匹配的 QnBot C++ SDK/Glove 交付包。需要目标手输出时，先安装 QnBot CLI
+0.1.0，或
 产品交付说明指定的兼容版本。
 
 macOS 或 Linux：
