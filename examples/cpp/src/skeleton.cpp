@@ -1,6 +1,7 @@
 #include <qnbot/glove.hpp>
 
 #include "example_cleanup.hpp"
+#include "example_support.hpp"
 
 #include <pthread.h>
 #include <signal.h>
@@ -14,8 +15,25 @@
 #include <system_error>
 #include <thread>
 
-int main() {
+int main(int argc, char** argv) {
     try {
+        std::string port;
+        std::optional<qnbot::Side> selected_side;
+        for (int index = 1; index < argc; ++index) {
+            const std::string argument = argv[index];
+            if (argument == "--port") {
+                port = example::require_value(argc, argv, index, argument);
+            } else if (argument == "--side") {
+                selected_side = example::parse_side(
+                    example::require_value(argc, argv, index, argument));
+            } else {
+                throw std::invalid_argument("unknown argument: " + argument);
+            }
+        }
+        if (port.empty()) throw std::invalid_argument("--port is required");
+        if (!selected_side) throw std::invalid_argument("--side is required");
+        const auto side = *selected_side;
+
         sigset_t wait_set;
         sigemptyset(&wait_set);
         sigaddset(&wait_set, SIGINT);
@@ -24,8 +42,7 @@ int main() {
             throw std::runtime_error("failed to block process stop signals");
         }
 
-        qnbot::SdkConfig config;
-        config.devices = {qnbot::GloveConfig{}};
+        auto config = example::serial_config(port, side);
         qnbot::Sdk sdk(config);
         example::Cleanup cleanup;
         std::optional<qnbot::Glove> glove;
@@ -58,8 +75,8 @@ int main() {
                     const auto& pose = sample.value;
                     std::cout << "pose sequence=" << sample.sequence
                               << " frame=" << pose.coordinate_frame
-                              << " wrist=[" << pose.positions_local[0][0] << ", "
-                              << pose.positions_local[0][1] << ", "
+                              << " wrist=[" << pose.positions_local[0][0]
+                              << ", " << pose.positions_local[0][1] << ", "
                               << pose.positions_local[0][2] << "] index_tip=["
                               << pose.positions_local[9][0] << ", "
                               << pose.positions_local[9][1] << ", "

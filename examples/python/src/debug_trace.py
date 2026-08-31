@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from threading import Lock
 
 from qnbot_sdk import (
     DebugConfig,
@@ -17,6 +18,7 @@ from qnbot_sdk import (
 from qnbot_sdk.glove import GloveConfig, GlovePose, HandJointCommand
 
 DEFAULT_TARGET_NAME = "openxr_hand"
+_PRINT_LOCK = Lock()
 
 
 def create_sdk(
@@ -72,14 +74,16 @@ def create_sdk(
 
 
 def print_pose(origin: str, sample: Sample[GlovePose]) -> None:
-    print(f"{origin} pose sequence={sample.sequence}")
+    with _PRINT_LOCK:
+        print(f"{origin} pose sequence={sample.sequence}")
 
 
 def print_output(sample: Sample[HandJointCommand]) -> None:
-    print(
-        f"retargeting sequence={sample.sequence} "
-        f"target={sample.value.target} joints={sample.value.joints}"
-    )
+    with _PRINT_LOCK:
+        print(
+            f"retargeting sequence={sample.sequence} "
+            f"target={sample.value.target} joints={sample.value.joints}"
+        )
 
 
 def main() -> None:

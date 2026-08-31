@@ -12,10 +12,10 @@
 
 namespace {
 
-constexpr const char* operator_id = "operator-a";
+constexpr const char* operator_id = "default";
 constexpr const char* left_source = "primary-glove-left";
 constexpr const char* right_source = "primary-glove-right";
-constexpr const char* target_name = "selected-hand";
+constexpr const char* target_name = "openxr_hand";
 
 struct Options {
     std::vector<std::string> package_ids;
@@ -44,20 +44,16 @@ Options parse_options(int argc, char** argv) {
 
 const char* readiness_name(qnbot::CaptureReadinessState state) {
     switch (state) {
-    case qnbot::CaptureReadinessState::not_required:
-        return "not_required";
-    case qnbot::CaptureReadinessState::ready:
-        return "ready";
-    case qnbot::CaptureReadinessState::needs_capture:
-        return "needs_capture";
+    case qnbot::CaptureReadinessState::not_required: return "not_required";
+    case qnbot::CaptureReadinessState::ready: return "ready";
+    case qnbot::CaptureReadinessState::needs_capture: return "needs_capture";
     }
     return "unknown";
 }
 
 const char* stage_readiness_name(qnbot::CaptureStageReadinessState state) {
     switch (state) {
-    case qnbot::CaptureStageReadinessState::reusable:
-        return "reusable";
+    case qnbot::CaptureStageReadinessState::reusable: return "reusable";
     case qnbot::CaptureStageReadinessState::needs_capture:
         return "needs_capture";
     }
@@ -66,38 +62,27 @@ const char* stage_readiness_name(qnbot::CaptureStageReadinessState state) {
 
 const char* session_state_name(qnbot::CaptureSessionState state) {
     switch (state) {
-    case qnbot::CaptureSessionState::created:
-        return "created";
+    case qnbot::CaptureSessionState::created: return "created";
     case qnbot::CaptureSessionState::awaiting_confirmation:
         return "awaiting_confirmation";
-    case qnbot::CaptureSessionState::collecting:
-        return "collecting";
-    case qnbot::CaptureSessionState::completed:
-        return "completed";
-    case qnbot::CaptureSessionState::failed:
-        return "failed";
-    case qnbot::CaptureSessionState::cancelled:
-        return "cancelled";
+    case qnbot::CaptureSessionState::collecting: return "collecting";
+    case qnbot::CaptureSessionState::completed: return "completed";
+    case qnbot::CaptureSessionState::failed: return "failed";
+    case qnbot::CaptureSessionState::cancelled: return "cancelled";
     }
     return "unknown";
 }
 
 const char* stage_state_name(qnbot::CaptureStageState state) {
     switch (state) {
-    case qnbot::CaptureStageState::pending:
-        return "pending";
-    case qnbot::CaptureStageState::reused:
-        return "reused";
+    case qnbot::CaptureStageState::pending: return "pending";
+    case qnbot::CaptureStageState::reused: return "reused";
     case qnbot::CaptureStageState::awaiting_confirmation:
         return "awaiting_confirmation";
-    case qnbot::CaptureStageState::collecting:
-        return "collecting";
-    case qnbot::CaptureStageState::captured:
-        return "captured";
-    case qnbot::CaptureStageState::skipped:
-        return "skipped";
-    case qnbot::CaptureStageState::failed:
-        return "failed";
+    case qnbot::CaptureStageState::collecting: return "collecting";
+    case qnbot::CaptureStageState::captured: return "captured";
+    case qnbot::CaptureStageState::skipped: return "skipped";
+    case qnbot::CaptureStageState::failed: return "failed";
     }
     return "unknown";
 }
@@ -109,28 +94,20 @@ const char* stage_origin_name(qnbot::CaptureStageOrigin origin) {
 
 const char* control_name(qnbot::CaptureControlAction action) {
     switch (action) {
-    case qnbot::CaptureControlAction::confirm:
-        return "confirm";
-    case qnbot::CaptureControlAction::retry:
-        return "retry";
-    case qnbot::CaptureControlAction::skip:
-        return "skip";
-    case qnbot::CaptureControlAction::cancel:
-        return "cancel";
+    case qnbot::CaptureControlAction::confirm: return "confirm";
+    case qnbot::CaptureControlAction::retry: return "retry";
+    case qnbot::CaptureControlAction::skip: return "skip";
+    case qnbot::CaptureControlAction::cancel: return "cancel";
     }
     return "unknown";
 }
 
 const char* calibration_state_name(qnbot::CalibrationJobState state) {
     switch (state) {
-    case qnbot::CalibrationJobState::running:
-        return "running";
-    case qnbot::CalibrationJobState::saving:
-        return "saving";
-    case qnbot::CalibrationJobState::completed:
-        return "completed";
-    case qnbot::CalibrationJobState::failed:
-        return "failed";
+    case qnbot::CalibrationJobState::running: return "running";
+    case qnbot::CalibrationJobState::saving: return "saving";
+    case qnbot::CalibrationJobState::completed: return "completed";
+    case qnbot::CalibrationJobState::failed: return "failed";
     }
     return "unknown";
 }
@@ -142,8 +119,8 @@ bool allows(const qnbot::CaptureSessionSnapshot& snapshot,
                      action) != snapshot.allowed_operations.end();
 }
 
-std::vector<std::string> retryable_stage_ids(
-    const qnbot::CaptureSessionSnapshot& snapshot) {
+std::vector<std::string>
+retryable_stage_ids(const qnbot::CaptureSessionSnapshot& snapshot) {
     std::vector<std::string> stage_ids;
     for (const auto& stage : snapshot.stage_runs) {
         if (stage.state == qnbot::CaptureStageState::captured ||
@@ -168,11 +145,11 @@ void render_capture_readiness(qnbot::Side side,
     std::cout << '\n';
 
     for (const auto& stage : readiness.plan.stages) {
-        const auto current = std::find_if(
-            readiness.stages.begin(), readiness.stages.end(),
-            [&](const qnbot::CaptureStageReadiness& value) {
-                return value.stage_id == stage.stage_id;
-            });
+        const auto current =
+            std::find_if(readiness.stages.begin(), readiness.stages.end(),
+                         [&](const qnbot::CaptureStageReadiness& value) {
+                             return value.stage_id == stage.stage_id;
+                         });
         if (current == readiness.stages.end()) {
             throw std::runtime_error("capture readiness omitted a plan stage");
         }
@@ -184,8 +161,9 @@ void render_capture_readiness(qnbot::Side side,
     }
 }
 
-std::string format_session_snapshot(
-    qnbot::Side side, const qnbot::CaptureSessionSnapshot& snapshot) {
+std::string
+format_session_snapshot(qnbot::Side side,
+                        const qnbot::CaptureSessionSnapshot& snapshot) {
     std::ostringstream output;
     output << (side == qnbot::Side::left ? "left" : "right")
            << ": session=" << session_state_name(snapshot.state)
@@ -214,8 +192,7 @@ void render_capture_set(qnbot::Side side,
                         const qnbot::CaptureSet& capture_set) {
     const auto snapshot = capture_set.snapshot();
     std::cout << (side == qnbot::Side::left ? "left" : "right")
-              << ": completed CaptureSet source=" << snapshot.source_id
-              << '\n';
+              << ": completed CaptureSet source=" << snapshot.source_id << '\n';
     for (const auto& stage : snapshot.stage_samples) {
         std::cout << "  " << stage.stage_id
                   << ": saved samples=" << stage.frame_count << '\n';
@@ -356,13 +333,14 @@ qnbot::CaptureSet capture_side(qnbot::Glove& glove,
                     } else {
                         std::cout << "stage is not available to retry\n";
                     }
-                } else if ((answer.empty() || answer == "confirm") &&
+                } else if ((answer.empty() || answer == "confirm" ||
+                            answer == "y" || answer == "yes") &&
                            allows(snapshot,
                                   qnbot::CaptureControlAction::confirm)) {
                     session.confirm(*snapshot.request_id);
                 } else {
-                    std::cout
-                        << "action is not allowed in the current session state\n";
+                    std::cout << "action is not allowed in the current session "
+                                 "state\n";
                 }
                 continue;
             }
@@ -427,9 +405,8 @@ void calibrate(qnbot::Glove& glove, const qnbot::CaptureSet& capture_set,
             }
             if (snapshot.state == qnbot::CalibrationJobState::failed) {
                 throw std::runtime_error(
-                    snapshot.failure
-                        ? snapshot.failure->message
-                        : std::string("calibration failed"));
+                    snapshot.failure ? snapshot.failure->message
+                                     : std::string("calibration failed"));
             }
             const auto update = glove.update();
             if (update.has_next_task()) static_cast<void>(update.sleep());
@@ -456,12 +433,12 @@ int main(int argc, char** argv) {
             glove->connect();
             glove->start();
 
-            left_capture_set = capture_side(
-                *glove, options.package_ids, left_source,
-                qnbot::Side::left, options.force);
-            right_capture_set = capture_side(
-                *glove, options.package_ids, right_source,
-                qnbot::Side::right, options.force);
+            left_capture_set =
+                capture_side(*glove, options.package_ids, left_source,
+                             qnbot::Side::left, options.force);
+            right_capture_set =
+                capture_side(*glove, options.package_ids, right_source,
+                             qnbot::Side::right, options.force);
 
             const auto selected_package_id =
                 options.package_ids.size() == 1

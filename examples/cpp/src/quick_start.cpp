@@ -1,6 +1,7 @@
 #include <qnbot/glove.hpp>
 
 #include "example_cleanup.hpp"
+#include "example_support.hpp"
 
 #include <pthread.h>
 #include <signal.h>
@@ -17,17 +18,28 @@
 int main(int argc, char** argv) {
     try {
         std::string package_id;
+        std::string port;
+        std::optional<qnbot::Side> selected_side;
         for (int index = 1; index < argc; ++index) {
             const std::string argument = argv[index];
             if (argument == "--package-id" && ++index < argc) {
                 package_id = argv[index];
+            } else if (argument == "--port") {
+                port = example::require_value(argc, argv, index, argument);
+            } else if (argument == "--side") {
+                selected_side = example::parse_side(
+                    example::require_value(argc, argv, index, argument));
             } else {
-                throw std::invalid_argument("unknown or incomplete argument: " + argument);
+                throw std::invalid_argument("unknown or incomplete argument: " +
+                                            argument);
             }
         }
         if (package_id.empty()) {
             throw std::invalid_argument("--package-id is required");
         }
+        if (port.empty()) throw std::invalid_argument("--port is required");
+        if (!selected_side) throw std::invalid_argument("--side is required");
+        const auto side = *selected_side;
         sigset_t wait_set;
         sigemptyset(&wait_set);
         sigaddset(&wait_set, SIGINT);
@@ -37,10 +49,14 @@ int main(int argc, char** argv) {
         }
 
         qnbot::TargetConfig target;
+        target.type = qnbot::TargetType::hand;
+        target.name = example::default_target_name;
+        target.side = side;
+        target.source = qnbot::DeviceSelector{"glove", std::string("primary"),
+                                              std::nullopt};
         target.algorithms = {qnbot::TargetAlgorithm{package_id}};
 
-        qnbot::SdkConfig config;
-        config.devices = {qnbot::GloveConfig{}};
+        auto config = example::serial_config(port, side);
         config.targets = {std::move(target)};
         qnbot::Sdk sdk(config);
         example::Cleanup cleanup;

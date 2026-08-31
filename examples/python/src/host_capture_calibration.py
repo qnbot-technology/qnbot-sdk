@@ -15,10 +15,10 @@ from qnbot_sdk.glove import (
     GloveConfig,
 )
 
-OPERATOR_ID = "operator-a"
+OPERATOR_ID = "default"
 LEFT_SOURCE = "primary-glove-left"
 RIGHT_SOURCE = "primary-glove-right"
-TARGET_NAME = "selected-hand"
+TARGET_NAME = "openxr_hand"
 
 
 def create_sdk() -> Sdk:
@@ -176,7 +176,7 @@ def capture_side(
                 ):
                     session.retry(retry_stage_id)
                 elif (
-                    answer in ("", "confirm")
+                    answer in ("", "confirm", "y", "yes")
                     and CaptureControlAction.CONFIRM in allowed
                 ):
                     session.confirm(snapshot.request_id)
