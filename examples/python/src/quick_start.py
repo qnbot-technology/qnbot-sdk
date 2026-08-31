@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import argparse
+
 from qnbot_sdk import (
     Sample,
     Sdk,
@@ -7,8 +9,6 @@ from qnbot_sdk import (
     TargetConfig,
 )
 from qnbot_sdk.glove import GloveConfig, GlovePose, HandJointCommand
-
-TARGET_PACKAGE_ID = "qnbot-dexhand"
 
 
 def print_pose(sample: Sample[GlovePose]) -> None:
@@ -26,11 +26,16 @@ def print_output(sample: Sample[HandJointCommand]) -> None:
 
 
 def main() -> None:
+    arguments = argparse.ArgumentParser(
+        description="Run the minimal target-output workflow"
+    )
+    arguments.add_argument("--package-id", required=True)
+    options = arguments.parse_args()
     sdk = Sdk(
         devices=(GloveConfig(),),
         targets=(
             TargetConfig(
-                algorithms=(TargetAlgorithm(TARGET_PACKAGE_ID),),
+                algorithms=(TargetAlgorithm(options.package_id),),
             ),
         ),
     )

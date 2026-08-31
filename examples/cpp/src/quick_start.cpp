@@ -14,14 +14,20 @@
 #include <system_error>
 #include <thread>
 
-namespace {
-
-constexpr const char* target_package_id = "qnbot-dexhand";
-
-} // namespace
-
-int main() {
+int main(int argc, char** argv) {
     try {
+        std::string package_id;
+        for (int index = 1; index < argc; ++index) {
+            const std::string argument = argv[index];
+            if (argument == "--package-id" && ++index < argc) {
+                package_id = argv[index];
+            } else {
+                throw std::invalid_argument("unknown or incomplete argument: " + argument);
+            }
+        }
+        if (package_id.empty()) {
+            throw std::invalid_argument("--package-id is required");
+        }
         sigset_t wait_set;
         sigemptyset(&wait_set);
         sigaddset(&wait_set, SIGINT);
@@ -31,7 +37,7 @@ int main() {
         }
 
         qnbot::TargetConfig target;
-        target.algorithms = {qnbot::TargetAlgorithm{target_package_id}};
+        target.algorithms = {qnbot::TargetAlgorithm{package_id}};
 
         qnbot::SdkConfig config;
         config.devices = {qnbot::GloveConfig{}};

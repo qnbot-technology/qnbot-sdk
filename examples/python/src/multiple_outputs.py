@@ -15,8 +15,6 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
 
-DEFAULT_PACKAGE_ID = "qnbot-dexhand"
-
 
 def create_sdk(
     port: str,
@@ -74,7 +72,7 @@ def main() -> None:
     )
     arguments.add_argument(
         "--package-id",
-        default=DEFAULT_PACKAGE_ID,
+        required=True,
         help="Installed algorithm package ID used by both output instances",
     )
     options = arguments.parse_args()

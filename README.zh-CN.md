@@ -2,6 +2,15 @@
 
 本仓库提供 QnBot SDK 的客户示例、运行说明和公开发布包入口。
 
+Python 用户默认通过 PyPI 安装：
+
+```bash
+python -m pip install qnbot-sdk-glove
+```
+
+也可以从 [GitHub Releases](https://github.com/qnbot-technology/qnbot-sdk/releases)
+下载与当前平台匹配的 wheel。C++ 用户从同一 Releases 页面下载匹配平台的 C++ 交付包。
+
 ## 快速入口
 
 | 语言 | 安装包 | 示例说明 |
@@ -9,8 +18,31 @@
 | Python | 通过 PyPI 安装 [qnbot-sdk-glove](https://pypi.org/project/qnbot-sdk-glove/) | [Python 示例](examples/python/README.zh-CN.md) |
 | C++ | 从 [Releases](https://github.com/qnbot-technology/qnbot-sdk/releases) 下载当前平台匹配的 Core 和 Glove C++ 包 | [C++ 示例](examples/cpp/README.zh-CN.md) |
 
-运行需要目标手算法包的示例前，请先按照产品交付说明，通过随产品提供的 CLI 安装对应
-算法包。请确保 SDK、算法包、操作系统和 CPU 架构相互匹配。
+## 安装 CLI 和目标手算法包
+
+运行需要目标手算法包的示例前，先安装 QnBot CLI 0.1.0，或产品交付说明指定的兼容版本。
+
+macOS 或 Linux：
+
+```bash
+curl -fsSL https://get.qnbot.com/cli | bash
+```
+
+Windows PowerShell：
+
+```powershell
+irm https://get.qnbot.com/cli.ps1 | iex
+```
+
+安装产品交付的算法包并确认安装结果：
+
+```bash
+qnbot --version
+qnbot algorithm install ./package.zip
+qnbot algorithm list
+```
+
+将 `./package.zip` 替换为与当前操作系统、CPU 架构和 SDK 版本匹配的算法包文件。
 
 ## 仓库内容
 

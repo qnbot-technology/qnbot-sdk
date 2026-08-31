@@ -13,7 +13,6 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
 
-DEFAULT_PACKAGE_ID = "qnbot-dexhand"
 DEFAULT_TARGET_NAME = "openxr_hand"
 
 
@@ -58,7 +57,7 @@ def main() -> None:
     )
     arguments.add_argument("--updates", type=int, default=100)
     arguments.add_argument("--target-name", default=DEFAULT_TARGET_NAME)
-    arguments.add_argument("--package-id", default=DEFAULT_PACKAGE_ID)
+    arguments.add_argument("--package-id", required=True)
     options = arguments.parse_args()
     if options.updates < 1:
         arguments.error("--updates must be at least 1")

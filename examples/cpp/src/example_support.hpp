@@ -16,7 +16,6 @@ namespace example {
 constexpr double max_duration_seconds = 3600.0;
 constexpr std::uint64_t max_update_count = 1000000;
 constexpr const char* default_target_name = "openxr_hand";
-constexpr const char* default_package_id = "qnbot-dexhand";
 
 struct SerialOptions {
     std::string port;
@@ -25,7 +24,7 @@ struct SerialOptions {
     std::uint64_t updates{10};
     double hold{1.0};
     std::string target_name{default_target_name};
-    std::string package_id{default_package_id};
+    std::string package_id;
     bool package_id_explicit{false};
     bool validate_only{false};
     bool external{false};
@@ -162,6 +161,10 @@ inline SerialOptions parse_serial_options(int argc, char** argv,
     }
     if (!options.external && !options.side) {
         throw std::invalid_argument("--side is required with --port");
+    }
+    if (!options.external && example != SerialExample::haptics &&
+        !options.package_id_explicit) {
+        throw std::invalid_argument("--package-id is required");
     }
     return options;
 }

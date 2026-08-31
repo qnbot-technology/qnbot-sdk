@@ -16,7 +16,6 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import GloveConfig, GlovePose, HandJointCommand
 
-DEFAULT_PACKAGE_ID = "qnbot-dexhand"
 DEFAULT_TARGET_NAME = "openxr_hand"
 
 
@@ -107,7 +106,7 @@ def main() -> None:
         default=DebugDetail.SUMMARY.value,
     )
     arguments.add_argument("--target-name", default=DEFAULT_TARGET_NAME)
-    arguments.add_argument("--package-id", default=DEFAULT_PACKAGE_ID)
+    arguments.add_argument("--package-id", required=True)
     options = arguments.parse_args()
     if options.sample_rate <= 0:
         arguments.error("--sample-rate must be greater than 0")

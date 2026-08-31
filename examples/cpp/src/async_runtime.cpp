@@ -19,7 +19,7 @@ struct Options {
     std::optional<qnbot::Side> side;
     std::uint64_t samples{10};
     std::string target_name{example::default_target_name};
-    std::string package_id{example::default_package_id};
+    std::string package_id;
     bool validate_only{false};
 };
 
@@ -50,6 +50,9 @@ Options parse_options(int argc, char** argv) {
     if (options.port.empty()) throw std::invalid_argument("--port is required");
     if (!options.side) {
         throw std::invalid_argument("--side is required with --port");
+    }
+    if (options.package_id.empty()) {
+        throw std::invalid_argument("--package-id is required");
     }
     return options;
 }

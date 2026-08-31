@@ -13,7 +13,7 @@ struct Options {
     std::string right_port;
     std::uint64_t updates{10};
     std::string target_name{example::default_target_name};
-    std::string package_id{example::default_package_id};
+    std::string package_id;
     bool validate_only{false};
 };
 
@@ -51,6 +51,9 @@ Options parse_options(int argc, char** argv) {
     if (options.left_port == options.right_port) {
         throw std::invalid_argument(
             "--left-port and --right-port must be different");
+    }
+    if (options.package_id.empty()) {
+        throw std::invalid_argument("--package-id is required");
     }
     return options;
 }
