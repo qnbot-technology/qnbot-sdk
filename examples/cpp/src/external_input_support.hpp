@@ -33,9 +33,9 @@ inline std::string parse_package_id(int argc, char** argv) {
         const std::string argument = argv[index];
         if (argument == "--package-id") {
             if (package_id)
-                throw std::invalid_argument("--package-id may be provided once");
-            package_id =
-                example::require_value(argc, argv, index, argument);
+                throw std::invalid_argument(
+                    "--package-id may be provided once");
+            package_id = example::require_value(argc, argv, index, argument);
         } else {
             throw std::invalid_argument("unknown argument: " + argument);
         }
@@ -45,14 +45,12 @@ inline std::string parse_package_id(int argc, char** argv) {
 }
 
 inline qnbot::SdkConfig make_config(const std::string& package_id) {
-    qnbot::GloveConfig glove{qnbot::Side::right,
-                             qnbot::ExternalConnection{}};
+    qnbot::GloveConfig glove{qnbot::Side::right, qnbot::ExternalConnection{}};
     glove.name = "external";
 
     qnbot::TargetConfig target{
         qnbot::TargetType::hand,
-        qnbot::DeviceSelector{"glove", std::string("external"),
-                              std::nullopt}};
+        qnbot::DeviceSelector{"glove", std::string("external"), std::nullopt}};
     target.name = "hand";
     target.side = qnbot::Side::right;
     target.algorithms = {qnbot::TargetAlgorithm{package_id}};
@@ -89,9 +87,10 @@ inline void confirm_calibration(
               << " [Y/n]: ";
     std::string answer;
     std::getline(std::cin, answer);
-    if (!answer.empty() && answer != "y" && answer != "Y" &&
-        answer != "yes" && answer != "YES") {
-        throw std::runtime_error("external input calibration was not confirmed");
+    if (!answer.empty() && answer != "y" && answer != "Y" && answer != "yes" &&
+        answer != "YES") {
+        throw std::runtime_error(
+            "external input calibration was not confirmed");
     }
     control.confirm(*sample->value.request_id);
     confirmed_request_ids.insert(*sample->value.request_id);
@@ -100,4 +99,3 @@ inline void confirm_calibration(
 } // namespace external_input_example
 
 #endif
-

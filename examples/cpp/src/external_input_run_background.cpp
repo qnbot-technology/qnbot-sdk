@@ -56,8 +56,7 @@ int main(int argc, char** argv) {
                     device.push_frame(external_input_example::frame(step));
                 if (step == 1)
                     std::cout << "pushed pose sequence="
-                              << pushed.meta.sequence.value_or(0)
-                              << '\n';
+                              << pushed.meta.sequence.value_or(0) << '\n';
                 external_input_example::confirm_calibration(
                     calibration_progress, calibration_control,
                     confirmed_request_ids);
@@ -85,12 +84,10 @@ int main(int argc, char** argv) {
         }
 
         if (runner_started && glove) {
-            cleanup.run("glove.request_stop()",
-                        [&] { glove->request_stop(); });
+            cleanup.run("glove.request_stop()", [&] { glove->request_stop(); });
             cleanup.run("glove.join()", [&] { glove->join(); });
         }
-        if (glove)
-            cleanup.run("glove.close()", [&] { glove->close(); });
+        if (glove) cleanup.run("glove.close()", [&] { glove->close(); });
         cleanup.run("sdk.close()", [&] { sdk.close(); });
         cleanup.rethrow_if_failed();
         std::cout << "external background input complete\n";
