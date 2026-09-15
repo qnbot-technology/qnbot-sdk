@@ -68,31 +68,28 @@ def main() -> None:
         options.target_name,
         options.package_id,
     )
-    try:
-        glove = sdk.glove()
-        glove.connect()
-        output = glove.device().output(name=options.target_name)
-        glove.start()
+    glove = sdk.glove()
+    output = glove.device().output(name=options.target_name)
+    glove.start()
 
-        for _ in range(options.updates):
-            update = glove.update()
-            print(
-                f"update tick={update.tick} tasks={update.ran_task_count} "
-                f"has_next={update.has_next_task}"
-            )
-            if update.has_next_task:
-                print(f"wait={update.sleep().value}")
-            sample = output.latest()
-            if sample is not None:
-                print_output(sample)
-
-        health = glove.health()
+    for _ in range(options.updates):
+        update = glove.update()
         print(
-            f"health ok={health.ok} warnings={health.warning_count} "
-            f"errors={health.error_count}"
+            f"update tick={update.tick} tasks={update.ran_task_count} "
+            f"has_next={update.has_next_task}"
         )
-    finally:
-        glove.close()
+        if update.has_next_task:
+            print(f"wait={update.sleep().value}")
+        sample = output.latest()
+        if sample is not None:
+            print_output(sample)
+
+    health = glove.health()
+    print(
+        f"health ok={health.ok} warnings={health.warning_count} "
+        f"errors={health.error_count}"
+    )
+    glove.close()
 
 
 if __name__ == "__main__":

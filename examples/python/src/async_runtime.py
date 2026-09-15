@@ -53,27 +53,22 @@ async def run(options: argparse.Namespace) -> None:
         options.package_id,
     )
     glove = sdk.glove()
-    try:
-        glove.connect()
-        output = glove.device().output(name=options.target_name)
-        glove.start()
+    output = glove.device().output(name=options.target_name)
+    glove.start()
+    glove.run_background()
 
-        glove.run_background()
-        try:
-            print_output("next", await output.next())
+    print_output("next", await output.next())
+    received = 0
+    async for sample in output:
+        print_output("stream", sample)
+        received += 1
+        if received >= options.samples:
+            break
 
-            received = 0
-            async for sample in output:
-                print_output("stream", sample)
-                received += 1
-                if received >= options.samples:
-                    break
-        finally:
-            glove.request_stop()
-            await asyncio.to_thread(glove.join)
-        print("async stopped")
-    finally:
-        await asyncio.to_thread(glove.close)
+    glove.request_stop()
+    await asyncio.to_thread(glove.join)
+    await asyncio.to_thread(glove.close)
+    print("async stopped")
 
 
 def main() -> None:

@@ -7,15 +7,16 @@ from qnbot_sdk import (
     AlgorithmsConfig,
     CalibrationConfig,
     CalibrationInteractionMode,
-    CalibrationProgressState,
     DeviceSelector,
     Sdk,
     Side,
     TargetAlgorithm,
     TargetConfig,
-    TargetType,
 )
 from qnbot_sdk.glove import (
+    CalibrationJobState,
+    CaptureSessionState,
+    CaptureStageState,
     ExternalConnection,
     ExternalGloveFrame,
     GloveConfig,
@@ -47,7 +48,6 @@ def create_sdk(package_id: str) -> Sdk:
         devices=(GloveConfig(side=Side.RIGHT, connection=ExternalConnection()),),
         targets=(
             TargetConfig(
-                type=TargetType.HAND,
                 name="hand",
                 side=Side.RIGHT,
                 source=DeviceSelector(type="glove", side=Side.RIGHT),
@@ -71,67 +71,73 @@ def main() -> None:
 
     sdk = create_sdk(options.package_id)
     glove = sdk.glove()
-    glove.connect()
     device = glove.device()
     pose = device.pose()
     output = device.output(name="hand")
-    progress = device.calibration_progress(name="hand")
-    control = device.calibration_control(name="hand")
+    capture_progress = device.capture_progress()
+    calibration_progress = device.calibration_progress(name="hand")
+    control = device.capture_control()
     confirmed_request_ids: set[str] = set()
 
-    def confirm_calibration() -> None:
-        sample = progress.latest()
+    def advance_capture() -> None:
+        sample = capture_progress.latest()
         if sample is None:
             return
         value = sample.value
-        if value.state is CalibrationProgressState.FAILED:
+        if value.session_state is CaptureSessionState.FAILED:
             message = (
                 value.failure.message if value.failure is not None else "unknown error"
             )
-            raise RuntimeError(f"external input calibration failed: {message}")
+            raise RuntimeError(f"external input capture failed: {message}")
+        stage = value.stage
         if (
-            value.state is not CalibrationProgressState.AWAITING_CONFIRMATION
-            or value.request_id is None
-            or value.request_id in confirmed_request_ids
+            stage.state is not CaptureStageState.AWAITING_CONFIRMATION
+            or stage.request_id is None
+            or stage.request_id in confirmed_request_ids
         ):
             return
-        answer = (
-            input(f"{value.prompt or 'Continue calibration'} [Y/n]: ").strip().lower()
-        )
+        answer = input(f"{stage.prompt or 'Continue capture'} [Y/n]: ").strip().lower()
         if answer not in ("", "y", "yes"):
-            raise RuntimeError("external input calibration was not confirmed")
-        control.confirm(value.request_id)
-        confirmed_request_ids.add(value.request_id)
+            raise RuntimeError("external input capture was not confirmed")
+        control.confirm(stage.request_id)
+        confirmed_request_ids.add(stage.request_id)
 
-    try:
-        device.start()
-        deadline = time.monotonic() + 60.0
-        step = 1
-        while output.latest() is None and time.monotonic() < deadline:
-            current = device.push_frame(frame(step))
-            if step == 1:
-                print(f"pushed pose sequence={current.meta.sequence}")
-            update = glove.update()
-            confirm_calibration()
-            step += 1
-            if update.has_next_task:
-                update.sleep()
-            else:
-                time.sleep(0.01)
-
-        latest_pose = pose.latest()
-        latest_output = output.latest()
-        if latest_pose is None or latest_output is None:
-            raise RuntimeError("external input did not publish retargeting output")
-        print(f"latest pose sequence={latest_pose.sequence}")
-        print(
-            f"latest retargeting output sequence={latest_output.sequence} "
-            f"target={latest_output.value.target} "
-            f"joints={latest_output.value.joints}"
-        )
-        print("external manual input complete")
-    finally:
-        glove.close()
+    device.start()
+    deadline = time.monotonic() + 60.0
+    step = 1
+    while output.latest() is None and time.monotonic() < deadline:
+        current = device.push_frame(frame(step))
+        if step == 1:
+            print(f"pushed pose sequence={current.meta.sequence}")
+        update = glove.update()
+        advance_capture()
+        calibration = calibration_progress.latest()
+        if (
+            calibration is not None
+            and calibration.value.job.state is CalibrationJobState.FAILED
+        ):
+            failure = calibration.value.job.failure
+            raise RuntimeError(
+                "external input calibration failed: "
+                + (failure.message if failure is not None else "unknown error")
+            )
+        step += 1
+        if update.has_next_task:
+            update.sleep()
+        else:
+            time.sleep(0.01)
+    latest_pose = pose.latest()
+    latest_output = output.latest()
+    if latest_pose is None or latest_output is None:
+        raise RuntimeError("external input did not publish retargeting output")
+    print(f"latest pose sequence={latest_pose.sequence}")
+    print(
+        f"latest retargeting output sequence={latest_output.sequence} "
+        f"target={latest_output.value.target} "
+        f"joints={latest_output.value.joints}"
+    )
+    glove.close()
+    print("external manual input complete")
 
 
 if __name__ == "__main__":

@@ -78,22 +78,13 @@ def main() -> None:
         options.package_id,
     )
     glove = sdk.glove()
-    try:
-        glove.connect()
-        output = glove.device().output(name=options.target_name)
-        output.subscribe(print_output)
-        glove.start()
-        print_health("running", glove.health())
+    output = glove.device().output(name=options.target_name)
+    output.subscribe(print_output)
+    glove.start()
+    print_health("running", glove.health())
 
-        try:
-            print("ready; press Ctrl+C to stop", flush=True)
-            glove.run_forever()
-        except KeyboardInterrupt:
-            print("\nstopping")
-        print("foreground stopped")
-        print_health("stopped lifecycle", glove.health())
-    finally:
-        glove.close()
+    print("running; press Ctrl+C to stop", flush=True)
+    glove.run_forever()
 
 
 if __name__ == "__main__":

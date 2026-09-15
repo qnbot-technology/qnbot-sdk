@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 
 from qnbot_sdk import (
-    AmbiguousSelectionError,
     DeviceSelector,
     Sample,
     Sdk,
@@ -11,7 +10,6 @@ from qnbot_sdk import (
     Side,
     TargetAlgorithm,
     TargetConfig,
-    TargetType,
 )
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
 
@@ -39,14 +37,12 @@ def create_sdk(
         ),
         targets=(
             TargetConfig(
-                type=TargetType.HAND,
                 name=target_name,
                 side=Side.LEFT,
                 source=DeviceSelector(type="glove", name="left"),
                 algorithms=(TargetAlgorithm(id=package_id),),
             ),
             TargetConfig(
-                type=TargetType.HAND,
                 name=target_name,
                 side=Side.RIGHT,
                 source=DeviceSelector(type="glove", name="right"),
@@ -83,64 +79,79 @@ def main() -> None:
         options.package_id,
     )
     glove = sdk.glove()
-    try:
-        glove.connect()
-        try:
-            glove.device()
-        except AmbiguousSelectionError:
-            print("selection requires name or side")
-        else:
-            raise RuntimeError("unqualified device selection was not ambiguous")
 
-        left = glove.device(name="left")
-        right = glove.device(side=Side.RIGHT)
-        left_output = left.output(name=options.target_name)
-        right_output = right.output(name=options.target_name)
-        left.start()
-        right.start()
+    left = glove.device(name="left")
+    right = glove.device(side=Side.RIGHT)
+    left_output = left.output(name=options.target_name)
+    right_output = right.output(name=options.target_name)
+    left.start()
+    right.start()
 
-        left_sequence: int | None = None
-        right_sequence: int | None = None
-        for _ in range(options.updates):
-            update = glove.update()
-            if update.has_next_task:
-                update.sleep()
-            left_sample = left_output.latest()
-            if left_sample is not None and left_sample.sequence != left_sequence:
-                print_output("left", left_sample)
-                left_sequence = left_sample.sequence
-            right_sample = right_output.latest()
-            if right_sample is not None and right_sample.sequence != right_sequence:
-                print_output("right", right_sample)
-                right_sequence = right_sample.sequence
-            if left_sequence is not None and right_sequence is not None:
-                break
+    for _ in range(options.updates):
+        update = glove.update()
+        if update.has_next_task:
+            update.sleep()
+        left_sample = left_output.latest()
+        if left_sample is not None:
+            print_output("left", left_sample)
+        right_sample = right_output.latest()
+        if right_sample is not None:
+            print_output("right", right_sample)
 
-        if left_sequence is None or right_sequence is None:
-            raise RuntimeError("both gloves must produce output before disconnect")
+    left_before_stop = left_output.latest()
+    if left_before_stop is None:
+        raise RuntimeError("both gloves must produce output before lifecycle control")
 
-        right.stop()
-        right.disconnect()
-        print("right device disconnected")
+    right.stop()
+    print("right device stopped; left remains active")
+    right_stopped_baseline = right_output.latest()
+    if right_stopped_baseline is None:
+        raise RuntimeError("right output was unavailable after stop")
+    left_sample = None
+    for _ in range(options.updates):
+        update = glove.update()
+        if update.has_next_task:
+            update.sleep()
+        right_candidate = right_output.latest()
+        if (
+            right_candidate is not None
+            and right_candidate.sequence > right_stopped_baseline.sequence
+        ):
+            raise RuntimeError("right output advanced while the device was stopped")
+        candidate = left_output.latest()
+        if candidate is not None and candidate.sequence > left_before_stop.sequence:
+            left_sample = candidate
+            break
+    if left_sample is None:
+        raise RuntimeError("left output did not advance while right was stopped")
+    print("left output while right stopped")
+    print_output("left", left_sample)
 
-        for _ in range(options.updates):
-            update = glove.update()
-            if update.has_next_task:
-                update.sleep()
-            left_sample = left_output.latest()
-            if left_sample is not None and left_sample.sequence != left_sequence:
-                print_output("left after right disconnect", left_sample)
-                break
-        else:
-            raise RuntimeError("left glove stopped producing after right disconnect")
+    right_before_restart = right_output.latest()
+    if right_before_restart is None:
+        raise RuntimeError("right output was unavailable before restart")
+    right.start()
+    print("right device restarted")
+    right_sample = None
+    for _ in range(options.updates):
+        update = glove.update()
+        if update.has_next_task:
+            update.sleep()
+        candidate = right_output.latest()
+        if candidate is not None and candidate.sequence > right_before_restart.sequence:
+            right_sample = candidate
+            break
+    if right_sample is None:
+        raise RuntimeError("right output did not advance after restart")
+    print("right output after restart")
+    print_output("right", right_sample)
 
-        health = glove.health()
-        print(
-            f"health ok={health.ok} warnings={health.warning_count} "
-            f"errors={health.error_count}"
-        )
-    finally:
-        glove.close()
+    health = glove.health()
+    print(
+        f"health ok={health.ok} warnings={health.warning_count} "
+        f"errors={health.error_count}"
+    )
+    glove.close()
 
 
 if __name__ == "__main__":

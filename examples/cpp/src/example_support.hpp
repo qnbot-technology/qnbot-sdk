@@ -6,15 +6,12 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
-#include <limits>
 #include <optional>
 #include <stdexcept>
 #include <string>
 
 namespace example {
 
-constexpr double max_duration_seconds = 3600.0;
-constexpr std::uint64_t max_update_count = 1000000;
 constexpr const char* default_target_name = "openxr_hand";
 
 struct SerialOptions {
@@ -25,8 +22,6 @@ struct SerialOptions {
     double hold{1.0};
     std::string target_name{default_target_name};
     std::string package_id;
-    bool package_id_explicit{false};
-    bool validate_only{false};
 };
 
 enum class SerialExample {
@@ -34,6 +29,7 @@ enum class SerialExample {
     background,
     foreground,
     haptics,
+    imu,
 };
 
 inline void validate_no_options(int argc, char** argv) {
@@ -72,8 +68,7 @@ inline double parse_positive_double(const std::string& text,
         throw std::invalid_argument(option + " has an invalid value");
     }
     if (consumed != text.size() || !std::isfinite(value) ||
-        (allow_zero ? value < 0.0 : value <= 0.0) ||
-        value > max_duration_seconds) {
+        (allow_zero ? value < 0.0 : value <= 0.0)) {
         throw std::invalid_argument(option + " has an invalid value");
     }
     return value;
@@ -81,21 +76,17 @@ inline double parse_positive_double(const std::string& text,
 
 inline std::uint64_t parse_positive_count(const std::string& text,
                                           const std::string& option) {
-    if (text.empty()) {
+    if (text.empty() || text.front() == '-') {
         throw std::invalid_argument(option + " has an invalid value");
     }
+    std::size_t consumed = 0;
     std::uint64_t value = 0;
-    for (const char character : text) {
-        if (character < '0' || character > '9') {
-            throw std::invalid_argument(option + " has an invalid value");
-        }
-        const auto digit = static_cast<std::uint64_t>(character - '0');
-        if (value > (max_update_count - digit) / 10) {
-            throw std::invalid_argument(option + " has an invalid value");
-        }
-        value = value * 10 + digit;
+    try {
+        value = std::stoull(text, &consumed);
+    } catch (const std::exception&) {
+        throw std::invalid_argument(option + " has an invalid value");
     }
-    if (value == 0 || value > max_update_count) {
+    if (consumed != text.size() || value == 0) {
         throw std::invalid_argument(option + " has an invalid value");
     }
     return value;
@@ -110,6 +101,8 @@ inline qnbot::Side parse_side(const std::string& text) {
 inline SerialOptions parse_serial_options(int argc, char** argv,
                                           SerialExample example) {
     SerialOptions options;
+    const bool requires_algorithm =
+        example != SerialExample::haptics && example != SerialExample::imu;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--port") {
@@ -128,15 +121,10 @@ inline SerialOptions parse_serial_options(int argc, char** argv,
         } else if (argument == "--hold" && example == SerialExample::haptics) {
             options.hold = parse_positive_double(
                 require_value(argc, argv, index, argument), argument, true);
-        } else if (argument == "--target-name" &&
-                   example != SerialExample::haptics) {
+        } else if (argument == "--target-name" && requires_algorithm) {
             options.target_name = require_value(argc, argv, index, argument);
-        } else if (argument == "--package-id" &&
-                   example != SerialExample::haptics) {
+        } else if (argument == "--package-id" && requires_algorithm) {
             options.package_id = require_value(argc, argv, index, argument);
-            options.package_id_explicit = true;
-        } else if (argument == "--validate") {
-            options.validate_only = true;
         } else {
             throw std::invalid_argument("unknown argument: " + argument);
         }
@@ -147,7 +135,7 @@ inline SerialOptions parse_serial_options(int argc, char** argv,
     if (!options.side) {
         throw std::invalid_argument("--side is required with --port");
     }
-    if (example != SerialExample::haptics && !options.package_id_explicit) {
+    if (requires_algorithm && options.package_id.empty()) {
         throw std::invalid_argument("--package-id is required");
     }
     return options;
@@ -171,14 +159,11 @@ inline qnbot::SdkConfig runtime_config(const SerialOptions& options) {
     auto config = serial_config(options.port, side);
 
     qnbot::TargetConfig target;
-    target.type = qnbot::TargetType::hand;
     target.name = options.target_name;
     target.side = side;
     target.source =
         qnbot::DeviceSelector{"glove", std::string("primary"), std::nullopt};
-    if (options.package_id_explicit) {
-        target.algorithms = {qnbot::TargetAlgorithm{options.package_id}};
-    }
+    target.algorithms = {qnbot::TargetAlgorithm{options.package_id}};
     config.targets.push_back(std::move(target));
     return config;
 }
