@@ -82,22 +82,18 @@ def main() -> None:
         options.package_id,
     )
     glove = sdk.glove()
-    try:
-        glove.connect()
-        output = glove.device().output(name=options.target_name)
-        output.subscribe(print_output)
-        glove.start()
-        glove.run_background()
-        try:
-            time.sleep(options.seconds)
-            print_health("running", glove.health())
-        finally:
-            glove.request_stop()
-            glove.join()
-        print("background stopped")
-        print_health("stopped lifecycle", glove.health())
-    finally:
-        glove.close()
+    output = glove.device().output(name=options.target_name)
+    output.subscribe(print_output)
+    glove.start()
+    glove.run_background()
+
+    time.sleep(options.seconds)
+    print_health("running", glove.health())
+
+    glove.request_stop()
+    glove.join()
+    glove.close()
+    print("background stopped")
 
 
 if __name__ == "__main__":

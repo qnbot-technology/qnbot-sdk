@@ -43,31 +43,25 @@ def main() -> None:
 
     sdk = create_sdk(options.port, Side(options.side))
     glove = sdk.glove()
-    haptics = None
-    try:
-        glove.connect()
-        glove.start()
+    glove.start()
 
-        haptics = glove.device().haptics()
-        haptics.set(
-            Haptics(
-                {
-                    GloveFinger.THUMB: 80,
-                    GloveFinger.INDEX: 40,
-                }
-            )
+    haptics = glove.device().haptics()
+    haptics.set(
+        Haptics(
+            {
+                GloveFinger.THUMB: 80,
+                GloveFinger.INDEX: 40,
+            }
         )
-        latest = haptics.latest()
-        if latest is not None:
-            print_haptics(latest)
-        time.sleep(options.hold)
-    finally:
-        try:
-            if haptics is not None:
-                haptics.clear()
-                print("haptics cleared")
-        finally:
-            glove.close()
+    )
+    latest = haptics.latest()
+    if latest is not None:
+        print_haptics(latest)
+    time.sleep(options.hold)
+
+    haptics.clear()
+    glove.close()
+    print("haptics cleared")
 
 
 if __name__ == "__main__":

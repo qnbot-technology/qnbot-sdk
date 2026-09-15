@@ -1,6 +1,5 @@
 #include <qnbot/coro.hpp>
 
-#include "example_cleanup.hpp"
 #include "example_coroutine_task.hpp"
 #include "example_support.hpp"
 
@@ -20,7 +19,6 @@ struct Options {
     std::uint64_t samples{10};
     std::string target_name{example::default_target_name};
     std::string package_id;
-    bool validate_only{false};
 };
 
 Options parse_options(int argc, char** argv) {
@@ -41,8 +39,6 @@ Options parse_options(int argc, char** argv) {
         } else if (argument == "--package-id") {
             options.package_id =
                 example::require_value(argc, argv, index, argument);
-        } else if (argument == "--validate") {
-            options.validate_only = true;
         } else {
             throw std::invalid_argument("unknown argument: " + argument);
         }
@@ -66,22 +62,12 @@ qnbot::SdkConfig make_config(const Options& options) {
     return example::runtime_config(runtime);
 }
 
-example::Task<qnbot::Sample<qnbot::HandJointCommand>>
-wait_for_output_impl(qnbot::ReadChannel<qnbot::HandJointCommand> channel,
-                     std::shared_ptr<qnbot::coro::DeferredExecutor> executor,
-                     std::stop_token stop_token) {
+example::Task<qnbot::Sample<qnbot::HandJointCommand>> wait_for_output(
+    qnbot::ReadChannel<qnbot::HandJointCommand> channel,
+    std::shared_ptr<qnbot::coro::DeferredExecutor> executor,
+    std::stop_token stop_token) {
     co_return co_await qnbot::coro::next(channel.next(), std::move(executor),
                                          stop_token);
-}
-
-example::Task<qnbot::Sample<qnbot::HandJointCommand>>
-wait_for_output(qnbot::ReadChannel<qnbot::HandJointCommand> channel,
-                const std::shared_ptr<example::QueueExecutor>& executor,
-                std::stop_token stop_token) {
-    const auto dispatch = example::make_task_dispatch(executor);
-    return example::bind_task_dispatch(
-        wait_for_output_impl(std::move(channel), dispatch.executor, stop_token),
-        dispatch);
 }
 
 } // namespace
@@ -90,53 +76,21 @@ int main(int argc, char** argv) {
     try {
         const auto options = parse_options(argc, argv);
         qnbot::Sdk sdk(make_config(options));
-        example::Cleanup cleanup;
-        std::optional<qnbot::Glove> glove;
-        std::shared_ptr<example::QueueExecutor> executor;
-        std::stop_source pending_stop;
-        std::optional<example::Task<qnbot::Sample<qnbot::HandJointCommand>>>
-            pending;
-        bool runner_started = false;
-        try {
-            glove.emplace(sdk.glove());
-            if (!options.validate_only) {
-                glove->connect();
-                auto output =
-                    glove->device("primary").output(options.target_name);
-                executor = std::make_shared<example::QueueExecutor>();
-                glove->start();
-                glove->run_background();
-                runner_started = true;
-                for (std::uint64_t index = 0; index < options.samples;
-                     ++index) {
-                    pending.emplace(wait_for_output(output, executor,
-                                                    pending_stop.get_token()));
-                    example::print_output(pending->get());
-                    pending.reset();
-                }
-                glove->request_stop();
-                glove->join();
-                runner_started = false;
-            }
-        } catch (...) {
-            cleanup.capture_current("async runtime");
+        auto glove = sdk.glove();
+        auto output = glove.device("primary").output(options.target_name);
+        auto executor = std::make_shared<example::QueueExecutor>();
+
+        glove.start();
+        glove.run_background();
+        for (std::uint64_t index = 0; index < options.samples; ++index) {
+            auto pending = wait_for_output(output, executor, std::stop_token{});
+            example::print_output(pending.get());
         }
 
-        pending_stop.request_stop();
-        cleanup.run("pending coroutine teardown", [&] { pending.reset(); });
-        if (runner_started && glove) {
-            cleanup.run("glove.request_stop()", [&] { glove->request_stop(); });
-            cleanup.run("glove.join()", [&] { glove->join(); });
-        }
-        if (glove) cleanup.run("glove.close()", [&] { glove->close(); });
-        cleanup.run("sdk.close()", [&] { sdk.close(); });
-        cleanup.run("executor teardown", [&] { executor.reset(); });
-        cleanup.rethrow_if_failed();
-        if (options.validate_only) {
-            std::cout << "async runtime configuration valid\n";
-        } else {
-            std::cout << "async runtime complete\n";
-        }
+        glove.request_stop();
+        glove.join();
+        glove.close();
+        std::cout << "async runtime complete\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         return example::report_error(error);

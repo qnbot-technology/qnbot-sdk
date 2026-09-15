@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
-from threading import Lock
 
 from qnbot_sdk import (
     DeviceSelector,
@@ -12,11 +11,8 @@ from qnbot_sdk import (
     Side,
     TargetAlgorithm,
     TargetConfig,
-    TargetType,
 )
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
-
-_PRINT_LOCK = Lock()
 
 
 def create_sdk(
@@ -35,14 +31,12 @@ def create_sdk(
         ),
         targets=(
             TargetConfig(
-                type=TargetType.HAND,
                 name="primary",
                 side=side,
                 source=source,
                 algorithms=(TargetAlgorithm(id=package_id),),
             ),
             TargetConfig(
-                type=TargetType.HAND,
                 name="backup",
                 side=side,
                 source=source,
@@ -54,11 +48,10 @@ def create_sdk(
 
 def print_output(name: str) -> Callable[[Sample[HandJointCommand]], None]:
     def show(sample: Sample[HandJointCommand]) -> None:
-        with _PRINT_LOCK:
-            print(
-                f"callback {name} sequence={sample.sequence} "
-                f"target={sample.value.target} joints={sample.value.joints}"
-            )
+        print(
+            f"callback {name} sequence={sample.sequence} "
+            f"target={sample.value.target} joints={sample.value.joints}"
+        )
 
     return show
 
@@ -87,32 +80,15 @@ def main() -> None:
         options.package_id,
     )
     glove = sdk.glove()
-    try:
-        glove.connect()
-        device = glove.device()
-        routes = (
-            (
-                "primary",
-                device.output(name="primary"),
-            ),
-            (
-                "backup",
-                device.output(name="backup"),
-            ),
-        )
-        for name, output in routes:
-            output.subscribe(print_output(name))
+    device = glove.device()
+    primary = device.output(name="primary")
+    backup = device.output(name="backup")
+    primary.subscribe(print_output("primary"))
+    backup.subscribe(print_output("backup"))
 
-        glove.start()
-
-        try:
-            print("ready; press Ctrl+C to stop", flush=True)
-            glove.run_forever()
-        except KeyboardInterrupt:
-            print("\nstopping")
-        print("multiple outputs stopped")
-    finally:
-        glove.close()
+    glove.start()
+    print("running; press Ctrl+C to stop", flush=True)
+    glove.run_forever()
 
 
 if __name__ == "__main__":

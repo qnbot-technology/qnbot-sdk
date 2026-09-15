@@ -1,4 +1,3 @@
-#include "example_cleanup.hpp"
 #include "example_support.hpp"
 
 #include <cstdlib>
@@ -14,7 +13,6 @@ struct Options {
     std::uint64_t updates{10};
     std::string target_name{example::default_target_name};
     std::string package_id;
-    bool validate_only{false};
 };
 
 Options parse_options(int argc, char** argv) {
@@ -36,8 +34,6 @@ Options parse_options(int argc, char** argv) {
         } else if (argument == "--package-id") {
             options.package_id =
                 example::require_value(argc, argv, index, argument);
-        } else if (argument == "--validate") {
-            options.validate_only = true;
         } else {
             throw std::invalid_argument("unknown argument: " + argument);
         }
@@ -70,7 +66,6 @@ qnbot::SdkConfig make_config(const Options& options) {
     right.name = "right";
 
     qnbot::TargetConfig left_target;
-    left_target.type = qnbot::TargetType::hand;
     left_target.name = options.target_name;
     left_target.side = qnbot::Side::left;
     left_target.source =
@@ -78,7 +73,6 @@ qnbot::SdkConfig make_config(const Options& options) {
     left_target.algorithms = {qnbot::TargetAlgorithm{options.package_id}};
 
     qnbot::TargetConfig right_target;
-    right_target.type = qnbot::TargetType::hand;
     right_target.name = options.target_name;
     right_target.side = qnbot::Side::right;
     right_target.source =
@@ -103,89 +97,87 @@ int main(int argc, char** argv) {
     try {
         const auto options = parse_options(argc, argv);
         qnbot::Sdk sdk(make_config(options));
-        example::Cleanup cleanup;
-        std::optional<qnbot::Glove> glove;
-        try {
-            glove.emplace(sdk.glove());
-            if (!options.validate_only) {
-                glove->connect();
-                try {
-                    static_cast<void>(glove->device());
-                    throw std::runtime_error(
-                        "unqualified device selection was not ambiguous");
-                } catch (const qnbot::AmbiguousSelectionError&) {
-                    std::cout << "selection requires name or side\n";
-                }
+        auto glove = sdk.glove();
 
-                auto left = glove->device("left");
-                auto right = glove->device(qnbot::Side::right);
-                auto left_output = left.output(options.target_name);
-                auto right_output = right.output(options.target_name);
-                left.start();
-                right.start();
+        auto left = glove.device("left");
+        auto right = glove.device(qnbot::Side::right);
+        auto left_output = left.output(options.target_name);
+        auto right_output = right.output(options.target_name);
+        left.start();
+        right.start();
 
-                std::optional<std::uint64_t> left_sequence;
-                std::optional<std::uint64_t> right_sequence;
-                for (std::uint64_t index = 0; index < options.updates;
-                     ++index) {
-                    const auto update = glove->update();
-                    if (update.has_next_task())
-                        static_cast<void>(update.sleep());
-                    if (const auto sample = left_output.latest()) {
-                        if (sample->sequence != left_sequence) {
-                            print_output("left", *sample);
-                            left_sequence = sample->sequence;
-                        }
-                    }
-                    if (const auto sample = right_output.latest()) {
-                        if (sample->sequence != right_sequence) {
-                            print_output("right", *sample);
-                            right_sequence = sample->sequence;
-                        }
-                    }
-                    if (left_sequence && right_sequence) break;
-                }
-                if (!left_sequence || !right_sequence) {
-                    throw std::runtime_error(
-                        "both gloves must produce output before disconnect");
-                }
-
-                right.stop();
-                right.disconnect();
-                std::cout << "right device disconnected\n";
-
-                bool left_remains_usable = false;
-                for (std::uint64_t index = 0; index < options.updates;
-                     ++index) {
-                    const auto update = glove->update();
-                    if (update.has_next_task())
-                        static_cast<void>(update.sleep());
-                    if (const auto sample = left_output.latest()) {
-                        if (sample->sequence != left_sequence) {
-                            print_output("left after right disconnect",
-                                         *sample);
-                            left_remains_usable = true;
-                            break;
-                        }
-                    }
-                }
-                if (!left_remains_usable) {
-                    throw std::runtime_error(
-                        "left glove stopped producing after right disconnect");
-                }
-                auto& domain = *glove;
-                example::print_health(domain.health());
+        for (std::uint64_t index = 0; index < options.updates; ++index) {
+            const auto update = glove.update();
+            if (update.has_next_task()) static_cast<void>(update.sleep());
+            if (const auto sample = left_output.latest()) {
+                print_output("left", *sample);
             }
-        } catch (...) {
-            cleanup.capture_current("device lifecycle");
+            if (const auto sample = right_output.latest()) {
+                print_output("right", *sample);
+            }
         }
 
-        if (glove) cleanup.run("glove.close()", [&] { glove->close(); });
-        cleanup.run("sdk.close()", [&] { sdk.close(); });
-        cleanup.rethrow_if_failed();
-        if (options.validate_only) {
-            std::cout << "device lifecycle configuration valid\n";
+        const auto left_before_stop = left_output.latest();
+        if (!left_before_stop) {
+            throw std::runtime_error(
+                "both gloves must produce output before lifecycle control");
         }
+
+        right.stop();
+        std::cout << "right device stopped; left remains active\n";
+        const auto right_stopped_baseline = right_output.latest();
+        if (!right_stopped_baseline) {
+            throw std::runtime_error("right output was unavailable after stop");
+        }
+        std::optional<qnbot::Sample<qnbot::HandJointCommand>> left_sample;
+        for (std::uint64_t index = 0; index < options.updates; ++index) {
+            const auto update = glove.update();
+            if (update.has_next_task()) static_cast<void>(update.sleep());
+            const auto right_candidate = right_output.latest();
+            if (right_candidate &&
+                right_candidate->sequence > right_stopped_baseline->sequence) {
+                throw std::runtime_error(
+                    "right output advanced while the device was stopped");
+            }
+            const auto candidate = left_output.latest();
+            if (candidate && candidate->sequence > left_before_stop->sequence) {
+                left_sample = candidate;
+                break;
+            }
+        }
+        if (!left_sample) {
+            throw std::runtime_error(
+                "left output did not advance while right was stopped");
+        }
+        std::cout << "left output while right stopped\n";
+        print_output("left", *left_sample);
+
+        const auto right_before_restart = right_output.latest();
+        if (!right_before_restart) {
+            throw std::runtime_error(
+                "right output was unavailable before restart");
+        }
+        right.start();
+        std::cout << "right device restarted\n";
+        std::optional<qnbot::Sample<qnbot::HandJointCommand>> right_sample;
+        for (std::uint64_t index = 0; index < options.updates; ++index) {
+            const auto update = glove.update();
+            if (update.has_next_task()) static_cast<void>(update.sleep());
+            const auto candidate = right_output.latest();
+            if (candidate &&
+                candidate->sequence > right_before_restart->sequence) {
+                right_sample = candidate;
+                break;
+            }
+        }
+        if (!right_sample) {
+            throw std::runtime_error(
+                "right output did not advance after restart");
+        }
+        std::cout << "right output after restart\n";
+        print_output("right", *right_sample);
+        example::print_health(glove.health());
+        glove.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         return example::report_error(error);
