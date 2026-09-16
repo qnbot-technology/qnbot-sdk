@@ -8,6 +8,50 @@
 #include <thread>
 #include <unordered_set>
 
+namespace {
+
+void handle_capture_prompt(
+    const qnbot::ReadChannel<qnbot::CaptureProgress>& capture_progress,
+    const qnbot::CaptureControl& capture_control,
+    const qnbot::ReadChannel<qnbot::CalibrationProgress>& calibration_progress,
+    std::unordered_set<std::string>& handled_request_ids) {
+    if (const auto capture = capture_progress.latest()) {
+        if (capture->value.session_state ==
+            qnbot::CaptureSessionState::failed) {
+            const auto message = capture->value.failure
+                                     ? capture->value.failure->message
+                                     : "unknown error";
+            throw std::runtime_error("capture failed: " + message);
+        }
+        const auto& stage = capture->value.stage;
+        if (stage.state == qnbot::CaptureStageState::awaiting_confirmation &&
+            stage.request_id &&
+            handled_request_ids.count(*stage.request_id) == 0) {
+            std::cout << stage.prompt << " [Y/n]: ";
+            std::string answer;
+            std::getline(std::cin, answer);
+            if (answer.empty() || answer == "y" || answer == "Y" ||
+                answer == "yes" || answer == "YES") {
+                capture_control.confirm(*stage.request_id);
+            } else {
+                capture_control.cancel(*stage.request_id);
+                throw std::runtime_error("capture was cancelled");
+            }
+            handled_request_ids.insert(*stage.request_id);
+        }
+    }
+    if (const auto calibration = calibration_progress.latest();
+        calibration &&
+        calibration->value.job.state == qnbot::CalibrationJobState::failed) {
+        const auto message = calibration->value.job.failure
+                                 ? calibration->value.job.failure->message
+                                 : "unknown error";
+        throw std::runtime_error("calibration failed: " + message);
+    }
+}
+
+} // namespace
+
 int main(int argc, char** argv) {
     try {
         const auto package_id =
@@ -36,9 +80,8 @@ int main(int argc, char** argv) {
                           << pushed.meta.sequence.value_or(0) << '\n';
             }
             const auto update = glove.update();
-            external_input_example::advance_capture(
-                capture_progress, capture_control, confirmed_request_ids);
-            external_input_example::check_calibration(calibration_progress);
+            handle_capture_prompt(capture_progress, capture_control,
+                                  calibration_progress, confirmed_request_ids);
             ++step;
             if (update.has_next_task())
                 static_cast<void>(update.sleep());

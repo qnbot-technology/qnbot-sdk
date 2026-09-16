@@ -7,7 +7,9 @@ from qnbot_sdk import (
     AlgorithmsConfig,
     CalibrationConfig,
     CalibrationInteractionMode,
+    CaptureControl,
     DeviceSelector,
+    ReadChannel,
     Sample,
     Sdk,
     Side,
@@ -16,6 +18,8 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import (
     CalibrationJobState,
+    CalibrationProgress,
+    CaptureProgress,
     CaptureSessionState,
     CaptureStageState,
     ExternalConnection,
@@ -65,6 +69,43 @@ def create_sdk(package_id: str) -> Sdk:
     )
 
 
+def handle_capture_prompt(
+    capture_progress: ReadChannel[CaptureProgress],
+    capture_control: CaptureControl,
+    calibration_progress: ReadChannel[CalibrationProgress],
+    handled_request_ids: set[str],
+) -> None:
+    capture = capture_progress.latest()
+    if capture is not None:
+        value = capture.value
+        if value.session_state is CaptureSessionState.FAILED:
+            message = value.failure.message if value.failure else "unknown error"
+            raise RuntimeError(f"capture failed: {message}")
+        stage = value.stage
+        if (
+            stage.state is CaptureStageState.AWAITING_CONFIRMATION
+            and stage.request_id is not None
+            and stage.request_id not in handled_request_ids
+        ):
+            answer = (
+                input(f"{stage.prompt or 'Continue capture'} [Y/n]: ").strip().lower()
+            )
+            if answer in ("", "y", "yes"):
+                capture_control.confirm(stage.request_id)
+            else:
+                capture_control.cancel(stage.request_id)
+                raise RuntimeError("capture was cancelled")
+            handled_request_ids.add(stage.request_id)
+    calibration = calibration_progress.latest()
+    if (
+        calibration is not None
+        and calibration.value.job.state is CalibrationJobState.FAILED
+    ):
+        failure = calibration.value.job.failure
+        message = failure.message if failure else "unknown error"
+        raise RuntimeError(f"calibration failed: {message}")
+
+
 def main() -> None:
     arguments = argparse.ArgumentParser(
         description="Push external frames while the SDK runs in the background"
@@ -91,29 +132,6 @@ def main() -> None:
             f"target={sample.value.target} joints={sample.value.joints}"
         )
 
-    def advance_capture() -> None:
-        sample = capture_progress.latest()
-        if sample is None:
-            return
-        value = sample.value
-        if value.session_state is CaptureSessionState.FAILED:
-            message = (
-                value.failure.message if value.failure is not None else "unknown error"
-            )
-            raise RuntimeError(f"external input capture failed: {message}")
-        stage = value.stage
-        if (
-            stage.state is not CaptureStageState.AWAITING_CONFIRMATION
-            or stage.request_id is None
-            or stage.request_id in confirmed_request_ids
-        ):
-            return
-        answer = input(f"{stage.prompt or 'Continue capture'} [Y/n]: ").strip().lower()
-        if answer not in ("", "y", "yes"):
-            raise RuntimeError("external input capture was not confirmed")
-        control.confirm(stage.request_id)
-        confirmed_request_ids.add(stage.request_id)
-
     pose_subscription = pose.subscribe(print_pose)
     output_subscription = output.subscribe(print_output)
     device.start()
@@ -125,17 +143,12 @@ def main() -> None:
         current = device.push_frame(frame(step))
         if step == 1:
             print(f"pushed pose sequence={current.meta.sequence}")
-        advance_capture()
-        calibration = calibration_progress.latest()
-        if (
-            calibration is not None
-            and calibration.value.job.state is CalibrationJobState.FAILED
-        ):
-            failure = calibration.value.job.failure
-            raise RuntimeError(
-                "external input calibration failed: "
-                + (failure.message if failure is not None else "unknown error")
-            )
+        handle_capture_prompt(
+            capture_progress,
+            control,
+            calibration_progress,
+            confirmed_request_ids,
+        )
         step += 1
         time.sleep(0.01)
 

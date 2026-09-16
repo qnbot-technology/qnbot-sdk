@@ -2,7 +2,6 @@
 
 本目录提供可直接构建的 C++ 客户示例，覆盖设备发现、手套姿态、有线 IMU 原始数据、
 目标手输出、运行模式、触觉反馈以及采集与标定。
-可运行的示例源码统一位于 `src/` 目录。
 
 ## 准备工作
 
@@ -12,7 +11,7 @@
 - 目标手输出示例所需的算法包。
 
 从 [GitHub Releases](https://github.com/qnbot-technology/qnbot-sdk/releases) 下载当前平台的
-SDK/Glove 交付包。需要目标手输出时，先安装 QnBot CLI 0.1.1，或产品交付说明指定的
+SDK/Glove 交付包。需要目标手输出时，先安装 QnBot CLI 0.2.0，或产品交付说明指定的
 兼容版本。
 
 macOS 或 Linux：

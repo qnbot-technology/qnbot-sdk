@@ -1,9 +1,12 @@
 #include "example_support.hpp"
 
 #include <cstdlib>
+#include <chrono>
 #include <iostream>
 #include <optional>
 #include <string>
+#include <thread>
+#include <unordered_set>
 
 namespace {
 
@@ -82,6 +85,8 @@ qnbot::SdkConfig make_config(const Options& options) {
     qnbot::SdkConfig config;
     config.devices = {left, right};
     config.targets = {left_target, right_target};
+    config.algorithms.calibration.interaction =
+        qnbot::CalibrationInteractionMode::external;
     return config;
 }
 
@@ -89,6 +94,46 @@ void print_output(const char* device_name,
                   const qnbot::Sample<qnbot::HandJointCommand>& sample) {
     std::cout << device_name << ' ';
     example::print_output(sample);
+}
+
+void handle_capture_prompt(
+    const qnbot::ReadChannel<qnbot::CaptureProgress>& capture_progress,
+    const qnbot::CaptureControl& capture_control,
+    const qnbot::ReadChannel<qnbot::CalibrationProgress>& calibration_progress,
+    std::unordered_set<std::string>& handled_request_ids) {
+    if (const auto capture = capture_progress.latest()) {
+        if (capture->value.session_state ==
+            qnbot::CaptureSessionState::failed) {
+            const auto message = capture->value.failure
+                                     ? capture->value.failure->message
+                                     : "unknown error";
+            throw std::runtime_error("capture failed: " + message);
+        }
+        const auto& stage = capture->value.stage;
+        if (stage.state == qnbot::CaptureStageState::awaiting_confirmation &&
+            stage.request_id &&
+            handled_request_ids.count(*stage.request_id) == 0) {
+            std::cout << stage.prompt << " [Y/n]: ";
+            std::string answer;
+            std::getline(std::cin, answer);
+            if (answer.empty() || answer == "y" || answer == "Y" ||
+                answer == "yes" || answer == "YES") {
+                capture_control.confirm(*stage.request_id);
+            } else {
+                capture_control.cancel(*stage.request_id);
+                throw std::runtime_error("capture was cancelled");
+            }
+            handled_request_ids.insert(*stage.request_id);
+        }
+    }
+    if (const auto calibration = calibration_progress.latest();
+        calibration &&
+        calibration->value.job.state == qnbot::CalibrationJobState::failed) {
+        const auto message = calibration->value.job.failure
+                                 ? calibration->value.job.failure->message
+                                 : "unknown error";
+        throw std::runtime_error("calibration failed: " + message);
+    }
 }
 
 } // namespace
@@ -103,8 +148,41 @@ int main(int argc, char** argv) {
         auto right = glove.device(qnbot::Side::right);
         auto left_output = left.output(options.target_name);
         auto right_output = right.output(options.target_name);
+        auto left_capture_progress = left.capture_progress();
+        auto right_capture_progress = right.capture_progress();
+        auto left_calibration_progress =
+            left.calibration_progress(options.target_name);
+        auto right_calibration_progress =
+            right.calibration_progress(options.target_name);
+        auto left_capture_control = left.capture_control();
+        auto right_capture_control = right.capture_control();
         left.start();
         right.start();
+
+        const auto wait_for_output =
+            [&](const auto& output, const auto& capture_progress,
+                const auto& capture_control, const auto& calibration_progress) {
+                std::unordered_set<std::string> handled_request_ids;
+                const auto deadline = std::chrono::steady_clock::now() +
+                                      std::chrono::seconds(300);
+                while (!output.latest() &&
+                       std::chrono::steady_clock::now() < deadline) {
+                    const auto update = glove.update();
+                    handle_capture_prompt(capture_progress, capture_control,
+                                          calibration_progress,
+                                          handled_request_ids);
+                    if (update.has_next_task())
+                        static_cast<void>(update.sleep());
+                }
+                if (!output.latest()) {
+                    throw std::runtime_error(
+                        "retargeting output was not ready before the timeout");
+                }
+            };
+        wait_for_output(left_output, left_capture_progress,
+                        left_capture_control, left_calibration_progress);
+        wait_for_output(right_output, right_capture_progress,
+                        right_capture_control, right_calibration_progress);
 
         for (std::uint64_t index = 0; index < options.updates; ++index) {
             const auto update = glove.update();

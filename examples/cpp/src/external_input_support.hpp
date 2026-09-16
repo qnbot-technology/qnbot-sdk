@@ -6,11 +6,9 @@
 #include <qnbot/glove.hpp>
 
 #include <cstdint>
-#include <iostream>
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
 
 namespace external_input_example {
 
@@ -61,48 +59,6 @@ inline qnbot::SdkConfig make_config(const std::string& package_id) {
     config.algorithms.calibration.interaction =
         qnbot::CalibrationInteractionMode::external;
     return config;
-}
-
-inline void
-advance_capture(const qnbot::ReadChannel<qnbot::CaptureProgress>& progress,
-                const qnbot::CaptureControl& control,
-                std::unordered_set<std::string>& confirmed_request_ids) {
-    const auto sample = progress.latest();
-    if (!sample) return;
-    if (sample->value.session_state == qnbot::CaptureSessionState::failed) {
-        const std::string message = sample->value.failure
-                                        ? sample->value.failure->message
-                                        : "unknown error";
-        throw std::runtime_error("external input capture failed: " + message);
-    }
-    const auto& stage = sample->value.stage;
-    if (stage.state != qnbot::CaptureStageState::awaiting_confirmation ||
-        !stage.request_id ||
-        confirmed_request_ids.count(*stage.request_id) != 0) {
-        return;
-    }
-
-    std::cout << stage.prompt << " [Y/n]: ";
-    std::string answer;
-    std::getline(std::cin, answer);
-    if (!answer.empty() && answer != "y" && answer != "Y" && answer != "yes" &&
-        answer != "YES") {
-        throw std::runtime_error("external input capture was not confirmed");
-    }
-    control.confirm(*stage.request_id);
-    confirmed_request_ids.insert(*stage.request_id);
-}
-
-inline void check_calibration(
-    const qnbot::ReadChannel<qnbot::CalibrationProgress>& progress) {
-    const auto sample = progress.latest();
-    if (!sample ||
-        sample->value.job.state != qnbot::CalibrationJobState::failed)
-        return;
-    const std::string message = sample->value.job.failure
-                                    ? sample->value.job.failure->message
-                                    : "unknown error";
-    throw std::runtime_error("external input calibration failed: " + message);
 }
 
 } // namespace external_input_example

@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import time
 
 from qnbot_sdk import (
+    AlgorithmsConfig,
+    CalibrationConfig,
+    CalibrationInteractionMode,
+    CaptureControl,
     DeviceSelector,
+    ReadChannel,
     Sample,
     Sdk,
     SerialConnection,
@@ -12,7 +18,15 @@ from qnbot_sdk import (
     TargetAlgorithm,
     TargetConfig,
 )
-from qnbot_sdk.glove import GloveConfig, HandJointCommand
+from qnbot_sdk.glove import (
+    CalibrationJobState,
+    CalibrationProgress,
+    CaptureProgress,
+    CaptureSessionState,
+    CaptureStageState,
+    GloveConfig,
+    HandJointCommand,
+)
 
 DEFAULT_TARGET_NAME = "openxr_hand"
 
@@ -35,6 +49,11 @@ def create_sdk(port: str, side: Side, target_name: str, package_id: str) -> Sdk:
                 algorithms=(TargetAlgorithm(id=package_id),),
             ),
         ),
+        algorithms=AlgorithmsConfig(
+            calibration=CalibrationConfig(
+                interaction=CalibrationInteractionMode.EXTERNAL,
+            ),
+        ),
     )
 
 
@@ -45,6 +64,63 @@ def print_output(origin: str, sample: Sample[HandJointCommand]) -> None:
     )
 
 
+def handle_capture_prompt(
+    capture_progress: ReadChannel[CaptureProgress],
+    capture_control: CaptureControl,
+    calibration_progress: ReadChannel[CalibrationProgress],
+    handled_request_ids: set[str],
+) -> None:
+    capture = capture_progress.latest()
+    if capture is not None:
+        value = capture.value
+        if value.session_state is CaptureSessionState.FAILED:
+            message = value.failure.message if value.failure else "unknown error"
+            raise RuntimeError(f"capture failed: {message}")
+        stage = value.stage
+        if (
+            stage.state is CaptureStageState.AWAITING_CONFIRMATION
+            and stage.request_id is not None
+            and stage.request_id not in handled_request_ids
+        ):
+            answer = (
+                input(f"{stage.prompt or 'Continue capture'} [Y/n]: ").strip().lower()
+            )
+            if answer in ("", "y", "yes"):
+                capture_control.confirm(stage.request_id)
+            else:
+                capture_control.cancel(stage.request_id)
+                raise RuntimeError("capture was cancelled")
+            handled_request_ids.add(stage.request_id)
+    calibration = calibration_progress.latest()
+    if (
+        calibration is not None
+        and calibration.value.job.state is CalibrationJobState.FAILED
+    ):
+        failure = calibration.value.job.failure
+        message = failure.message if failure else "unknown error"
+        raise RuntimeError(f"calibration failed: {message}")
+
+
+def wait_for_output(
+    output: ReadChannel[HandJointCommand],
+    capture_progress: ReadChannel[CaptureProgress],
+    capture_control: CaptureControl,
+    calibration_progress: ReadChannel[CalibrationProgress],
+) -> None:
+    handled_request_ids: set[str] = set()
+    deadline = time.monotonic() + 300.0
+    while output.latest() is None and time.monotonic() < deadline:
+        handle_capture_prompt(
+            capture_progress,
+            capture_control,
+            calibration_progress,
+            handled_request_ids,
+        )
+        time.sleep(0.05)
+    if output.latest() is None:
+        raise RuntimeError("retargeting output was not ready before the timeout")
+
+
 async def run(options: argparse.Namespace) -> None:
     sdk = create_sdk(
         options.port,
@@ -53,9 +129,21 @@ async def run(options: argparse.Namespace) -> None:
         options.package_id,
     )
     glove = sdk.glove()
-    output = glove.device().output(name=options.target_name)
+    device = glove.device()
+    output = device.output(name=options.target_name)
+    capture_progress = device.capture_progress()
+    calibration_progress = device.calibration_progress(name=options.target_name)
+    capture_control = device.capture_control()
     glove.start()
     glove.run_background()
+
+    await asyncio.to_thread(
+        wait_for_output,
+        output,
+        capture_progress,
+        capture_control,
+        calibration_progress,
+    )
 
     print_output("next", await output.next())
     received = 0

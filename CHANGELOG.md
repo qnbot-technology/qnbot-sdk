@@ -2,6 +2,12 @@
 
 本文件记录 QnBot SDK 示例和安装包交付的变化。
 
+## 1.2.0 - 2026-09-15
+
+- 算法包统一通过 QnBot CLI 在线查找和安装，并由 package ID 表示客户选择。
+- 示例覆盖有线 IMU、VetraGlove Nano、连接状态和 Debug 诊断等 1.2.0 客户流程。
+- SDK 与 CLI 都提供 Linux x86_64、Linux ARM64、macOS ARM64 和 Windows x86_64 四平台交付。
+
 ## 0.5.2 - 2026-09-11
 
 - Python 和 C++ quick start 改为零参数自动发现单只手套并读取姿态，不再要求算法包。

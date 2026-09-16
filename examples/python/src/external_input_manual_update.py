@@ -7,7 +7,9 @@ from qnbot_sdk import (
     AlgorithmsConfig,
     CalibrationConfig,
     CalibrationInteractionMode,
+    CaptureControl,
     DeviceSelector,
+    ReadChannel,
     Sdk,
     Side,
     TargetAlgorithm,
@@ -15,6 +17,8 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import (
     CalibrationJobState,
+    CalibrationProgress,
+    CaptureProgress,
     CaptureSessionState,
     CaptureStageState,
     ExternalConnection,
@@ -62,6 +66,43 @@ def create_sdk(package_id: str) -> Sdk:
     )
 
 
+def handle_capture_prompt(
+    capture_progress: ReadChannel[CaptureProgress],
+    capture_control: CaptureControl,
+    calibration_progress: ReadChannel[CalibrationProgress],
+    handled_request_ids: set[str],
+) -> None:
+    capture = capture_progress.latest()
+    if capture is not None:
+        value = capture.value
+        if value.session_state is CaptureSessionState.FAILED:
+            message = value.failure.message if value.failure else "unknown error"
+            raise RuntimeError(f"external input capture failed: {message}")
+        stage = value.stage
+        if (
+            stage.state is CaptureStageState.AWAITING_CONFIRMATION
+            and stage.request_id is not None
+            and stage.request_id not in handled_request_ids
+        ):
+            answer = (
+                input(f"{stage.prompt or 'Continue capture'} [Y/n]: ").strip().lower()
+            )
+            if answer in ("", "y", "yes"):
+                capture_control.confirm(stage.request_id)
+            else:
+                capture_control.cancel(stage.request_id)
+                raise RuntimeError("external input capture was cancelled")
+            handled_request_ids.add(stage.request_id)
+    calibration = calibration_progress.latest()
+    if (
+        calibration is not None
+        and calibration.value.job.state is CalibrationJobState.FAILED
+    ):
+        failure = calibration.value.job.failure
+        message = failure.message if failure else "unknown error"
+        raise RuntimeError(f"external input calibration failed: {message}")
+
+
 def main() -> None:
     arguments = argparse.ArgumentParser(
         description="Push external frames and update the SDK from the application loop"
@@ -79,29 +120,6 @@ def main() -> None:
     control = device.capture_control()
     confirmed_request_ids: set[str] = set()
 
-    def advance_capture() -> None:
-        sample = capture_progress.latest()
-        if sample is None:
-            return
-        value = sample.value
-        if value.session_state is CaptureSessionState.FAILED:
-            message = (
-                value.failure.message if value.failure is not None else "unknown error"
-            )
-            raise RuntimeError(f"external input capture failed: {message}")
-        stage = value.stage
-        if (
-            stage.state is not CaptureStageState.AWAITING_CONFIRMATION
-            or stage.request_id is None
-            or stage.request_id in confirmed_request_ids
-        ):
-            return
-        answer = input(f"{stage.prompt or 'Continue capture'} [Y/n]: ").strip().lower()
-        if answer not in ("", "y", "yes"):
-            raise RuntimeError("external input capture was not confirmed")
-        control.confirm(stage.request_id)
-        confirmed_request_ids.add(stage.request_id)
-
     device.start()
     deadline = time.monotonic() + 60.0
     step = 1
@@ -110,17 +128,12 @@ def main() -> None:
         if step == 1:
             print(f"pushed pose sequence={current.meta.sequence}")
         update = glove.update()
-        advance_capture()
-        calibration = calibration_progress.latest()
-        if (
-            calibration is not None
-            and calibration.value.job.state is CalibrationJobState.FAILED
-        ):
-            failure = calibration.value.job.failure
-            raise RuntimeError(
-                "external input calibration failed: "
-                + (failure.message if failure is not None else "unknown error")
-            )
+        handle_capture_prompt(
+            capture_progress,
+            control,
+            calibration_progress,
+            confirmed_request_ids,
+        )
         step += 1
         if update.has_next_task:
             update.sleep()
