@@ -6,11 +6,9 @@
 #include <qnbot/glove.hpp>
 
 #include <cstdint>
-#include <iostream>
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
 
 namespace external_input_example {
 
@@ -33,9 +31,9 @@ inline std::string parse_package_id(int argc, char** argv) {
         const std::string argument = argv[index];
         if (argument == "--package-id") {
             if (package_id)
-                throw std::invalid_argument("--package-id may be provided once");
-            package_id =
-                example::require_value(argc, argv, index, argument);
+                throw std::invalid_argument(
+                    "--package-id may be provided once");
+            package_id = example::require_value(argc, argv, index, argument);
         } else {
             throw std::invalid_argument("unknown argument: " + argument);
         }
@@ -45,14 +43,12 @@ inline std::string parse_package_id(int argc, char** argv) {
 }
 
 inline qnbot::SdkConfig make_config(const std::string& package_id) {
-    qnbot::GloveConfig glove{qnbot::Side::right,
-                             qnbot::ExternalConnection{}};
+    qnbot::GloveConfig glove{qnbot::Side::right, qnbot::ExternalConnection{}};
     glove.name = "external";
 
-    qnbot::TargetConfig target{
-        qnbot::TargetType::hand,
-        qnbot::DeviceSelector{"glove", std::string("external"),
-                              std::nullopt}};
+    qnbot::TargetConfig target;
+    target.source =
+        qnbot::DeviceSelector{"glove", std::string("external"), std::nullopt};
     target.name = "hand";
     target.side = qnbot::Side::right;
     target.algorithms = {qnbot::TargetAlgorithm{package_id}};
@@ -65,39 +61,6 @@ inline qnbot::SdkConfig make_config(const std::string& package_id) {
     return config;
 }
 
-inline void confirm_calibration(
-    const qnbot::ReadChannel<qnbot::CalibrationProgress>& progress,
-    const qnbot::CalibrationControl& control,
-    std::unordered_set<std::string>& confirmed_request_ids) {
-    const auto sample = progress.latest();
-    if (!sample) return;
-    if (sample->value.state == qnbot::CalibrationProgressState::failed) {
-        const std::string message = sample->value.failure
-                                        ? sample->value.failure->message
-                                        : "unknown error";
-        throw std::runtime_error("external input calibration failed: " +
-                                 message);
-    }
-    if (sample->value.state !=
-            qnbot::CalibrationProgressState::awaiting_confirmation ||
-        !sample->value.request_id ||
-        confirmed_request_ids.count(*sample->value.request_id) != 0) {
-        return;
-    }
-
-    std::cout << sample->value.prompt.value_or("Continue calibration")
-              << " [Y/n]: ";
-    std::string answer;
-    std::getline(std::cin, answer);
-    if (!answer.empty() && answer != "y" && answer != "Y" &&
-        answer != "yes" && answer != "YES") {
-        throw std::runtime_error("external input calibration was not confirmed");
-    }
-    control.confirm(*sample->value.request_id);
-    confirmed_request_ids.insert(*sample->value.request_id);
-}
-
 } // namespace external_input_example
 
 #endif
-

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import sys
-
 from qnbot_sdk import Sample, Sdk
 from qnbot_sdk.glove import GloveConfig, GlovePose
 
@@ -14,25 +12,14 @@ def print_pose(sample: Sample[GlovePose]) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) != 1:
-        raise SystemExit("quick_start does not accept arguments")
-
     sdk = Sdk(devices=(GloveConfig(),))
     glove = sdk.glove()
-    try:
-        glove.connect()
-        device = glove.device()
-        pose = device.pose()
-        pose.subscribe(print_pose)
+    pose = glove.device().pose()
+    pose.subscribe(print_pose)
 
-        glove.start()
-
-        try:
-            glove.run_forever()
-        except KeyboardInterrupt:
-            print("\nstopping")
-    finally:
-        glove.close()
+    glove.start()
+    print("running; press Ctrl+C to stop", flush=True)
+    glove.run_forever()
 
 
 if __name__ == "__main__":

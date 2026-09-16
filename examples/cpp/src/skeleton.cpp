@@ -1,134 +1,62 @@
 #include <qnbot/glove.hpp>
 
-#include "example_cleanup.hpp"
 #include "example_support.hpp"
 
-#include <pthread.h>
-#include <signal.h>
-
-#include <atomic>
 #include <cstdlib>
-#include <exception>
 #include <iostream>
-#include <mutex>
 #include <optional>
-#include <system_error>
-#include <thread>
+#include <string>
 
 int main(int argc, char** argv) {
     try {
         std::string port;
-        std::optional<qnbot::Side> selected_side;
+        std::optional<qnbot::Side> side;
         for (int index = 1; index < argc; ++index) {
             const std::string argument = argv[index];
             if (argument == "--port") {
                 port = example::require_value(argc, argv, index, argument);
             } else if (argument == "--side") {
-                selected_side = example::parse_side(
+                side = example::parse_side(
                     example::require_value(argc, argv, index, argument));
             } else {
                 throw std::invalid_argument("unknown argument: " + argument);
             }
         }
         if (port.empty()) throw std::invalid_argument("--port is required");
-        if (!selected_side) throw std::invalid_argument("--side is required");
-        const auto side = *selected_side;
+        if (!side) throw std::invalid_argument("--side is required");
 
-        sigset_t wait_set;
-        sigemptyset(&wait_set);
-        sigaddset(&wait_set, SIGINT);
-        sigaddset(&wait_set, SIGUSR1);
-        if (pthread_sigmask(SIG_BLOCK, &wait_set, nullptr) != 0) {
-            throw std::runtime_error("failed to block process stop signals");
-        }
+        qnbot::Sdk sdk(example::serial_config(port, *side));
+        auto glove = sdk.glove();
 
-        auto config = example::serial_config(port, side);
-        qnbot::Sdk sdk(config);
-        example::Cleanup cleanup;
-        std::optional<qnbot::Glove> glove;
-        std::optional<qnbot::Subscription> joint_angles_subscription;
-        std::optional<qnbot::Subscription> pose_subscription;
-        std::mutex error_mutex;
-        std::exception_ptr stop_error;
-        std::atomic<bool> runner_finished{false};
-        std::thread coordinator;
-        try {
-            glove.emplace(sdk.glove());
-            glove->connect();
-            auto device = glove->device();
-            auto skeleton = device.skeleton();
-            joint_angles_subscription.emplace(skeleton.joint_angles().subscribe(
+        auto skeleton = glove.device().skeleton();
+        const auto joint_angles_subscription =
+            skeleton.joint_angles().subscribe(
                 [](const qnbot::Sample<qnbot::HandJointCommand>& sample) {
                     std::cout << "skeleton sequence=" << sample.sequence
                               << " target=" << sample.value.target
-                              << " joints={";
-                    bool first = true;
-                    for (const auto& joint : sample.value.joints) {
-                        if (!first) std::cout << ", ";
-                        std::cout << joint.first << ": " << joint.second;
-                        first = false;
-                    }
-                    std::cout << "}\n";
-                }));
-            pose_subscription.emplace(skeleton.pose().subscribe(
-                [](const qnbot::Sample<qnbot::HandSkeletonPose>& sample) {
-                    const auto& pose = sample.value;
-                    std::cout << "pose sequence=" << sample.sequence
-                              << " frame=" << pose.coordinate_frame
-                              << " wrist=[" << pose.positions_local[0][0]
-                              << ", " << pose.positions_local[0][1] << ", "
-                              << pose.positions_local[0][2] << "] index_tip=["
-                              << pose.positions_local[9][0] << ", "
-                              << pose.positions_local[9][1] << ", "
-                              << pose.positions_local[9][2] << "]\n";
-                }));
-            glove->start();
-
-            coordinator = std::thread([&] {
-                for (;;) {
-                    int received = 0;
-                    const int wait_error = sigwait(&wait_set, &received);
-                    if (wait_error != 0) {
-                        std::lock_guard<std::mutex> lock(error_mutex);
-                        stop_error = std::make_exception_ptr(std::system_error(
-                            wait_error, std::generic_category(),
-                            "failed to wait for process stop signal"));
-                        return;
-                    }
-                    if (received == SIGUSR1) {
-                        if (runner_finished.load()) return;
-                        continue;
-                    }
-                    if (received != SIGINT) continue;
-                    try {
-                        glove->request_stop();
-                    } catch (...) {
-                        std::lock_guard<std::mutex> lock(error_mutex);
-                        stop_error = std::current_exception();
-                    }
-                    return;
-                }
+                              << " joints=" << sample.value.joints.size()
+                              << '\n';
+                });
+        const auto pose_subscription = skeleton.pose().subscribe(
+            [](const qnbot::Sample<qnbot::HandSkeletonPose>& sample) {
+                const auto& pose = sample.value;
+                std::cout << "pose sequence=" << sample.sequence
+                          << " frame=" << pose.coordinate_frame << " wrist=["
+                          << pose.positions_local[0][0] << ", "
+                          << pose.positions_local[0][1] << ", "
+                          << pose.positions_local[0][2] << "] index_tip=["
+                          << pose.positions_local[9][0] << ", "
+                          << pose.positions_local[9][1] << ", "
+                          << pose.positions_local[9][2] << "]\n";
             });
-            std::cout << "running; press Ctrl+C to stop" << std::endl;
-            glove->run_forever();
-        } catch (...) {
-            cleanup.capture_current("skeleton");
-        }
 
-        runner_finished.store(true);
-        if (coordinator.joinable()) {
-            pthread_kill(coordinator.native_handle(), SIGUSR1);
-            cleanup.run("signal coordinator join()",
-                        [&] { coordinator.join(); });
-            std::lock_guard<std::mutex> lock(error_mutex);
-            cleanup.capture("glove.request_stop()", stop_error);
-        }
-        if (glove) cleanup.run("glove.close()", [&] { glove->close(); });
-        cleanup.run("sdk.close()", [&] { sdk.close(); });
-        cleanup.rethrow_if_failed();
+        glove.start();
+        std::cout << "running; press Ctrl+C to stop" << std::endl;
+        glove.run_forever();
+        static_cast<void>(joint_angles_subscription);
+        static_cast<void>(pose_subscription);
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
-        std::cerr << "qnbot skeleton example failed: " << error.what() << '\n';
-        return EXIT_FAILURE;
+        return example::report_error(error);
     }
 }

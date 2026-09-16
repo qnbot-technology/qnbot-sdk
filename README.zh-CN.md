@@ -1,6 +1,7 @@
 # QnBot SDK 客户示例
 
-本仓库提供 QnBot SDK 的客户示例、运行说明和公开发布包入口。
+本仓库提供 QnBot SDK 的客户示例、运行说明和公开发布包入口，覆盖设备发现、手套姿态、
+有线 IMU 原始数据、目标手输出、运行模式和触觉反馈。
 
 Python 用户默认通过 PyPI 安装：
 
@@ -20,7 +21,7 @@ python -m pip install qnbot-sdk-glove
 
 ## 安装 CLI 和目标手算法包
 
-运行需要目标手算法包的示例前，先安装 QnBot CLI 0.1.1，或产品交付说明指定的兼容版本。
+运行需要目标手算法包的示例前，先安装 QnBot CLI 0.2.0，或产品交付说明指定的兼容版本。
 
 macOS 或 Linux：
 
