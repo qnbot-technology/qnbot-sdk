@@ -135,7 +135,10 @@ def capture_side(
             ),
             None,
         )
-        if current is not None and current.state is CaptureStageState.AWAITING_CONFIRMATION:
+        if (
+            current is not None
+            and current.state is CaptureStageState.AWAITING_CONFIRMATION
+        ):
             if snapshot.request_id is None:
                 session.cancel()
                 raise RuntimeError("capture confirmation is missing its request token")

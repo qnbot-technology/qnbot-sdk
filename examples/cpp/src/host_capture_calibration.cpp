@@ -176,8 +176,7 @@ qnbot::CaptureSession capture_side(qnbot::Glove& glove,
                        stage.stage_id == *snapshot.current_stage;
             });
         if (current != snapshot.stage_progress.end() &&
-            current->state ==
-                qnbot::CaptureStageState::awaiting_confirmation) {
+            current->state == qnbot::CaptureStageState::awaiting_confirmation) {
             if (!snapshot.request_id) {
                 session.cancel();
                 throw std::runtime_error(
@@ -280,8 +279,8 @@ int main(int argc, char** argv) {
         right_session.close();
         left_session.close();
         glove.close();
-        std::cout
-            << "Calibration results are saved and applied to retargeting by the SDK.\n";
+        std::cout << "Calibration results are saved and applied to retargeting "
+                     "by the SDK.\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << "host capture and calibration failed: " << error.what()

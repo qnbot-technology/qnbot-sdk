@@ -60,8 +60,9 @@ private:
             std::function<void()> task;
             {
                 std::unique_lock<std::mutex> lock(state->mutex);
-                state->ready.wait(
-                    lock, [&] { return state->stopping || !state->tasks.empty(); });
+                state->ready.wait(lock, [&] {
+                    return state->stopping || !state->tasks.empty();
+                });
                 if (state->tasks.empty() && state->stopping) return;
                 task = std::move(state->tasks.front());
                 state->tasks.pop_front();
