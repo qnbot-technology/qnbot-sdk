@@ -1,0 +1,11 @@
+[project]
+name = "qnbot-sdk-composite-exo-glove-examples"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "qnbot-sdk-exo",
+    "qnbot-sdk-glove",
+]
+
+[tool.uv]
+package = false

@@ -7,17 +7,25 @@
 **/.uv-cache/
 
 # Locally delivered SDK artifacts
-examples/python/wheelhouse/
-examples/python/dist/
+glove/python/wheelhouse/
+glove/python/dist/
+exo/python/wheelhouse/
+exo/python/dist/
+composite-exo-glove/python/wheelhouse/
+composite-exo-glove/python/dist/
 **/*.whl
 
 # CMake build trees
-examples/cpp/build*/
+glove/cpp/build*/
+exo/cpp/build*/
+composite-exo-glove/cpp/build*/
 
 # Example output and diagnostics
 **/*.log
 **/*.jsonl
-examples/python/captures/
+glove/python/captures/
+exo/python/captures/
+composite-exo-glove/python/captures/
 
 # Local tooling
 .DS_Store

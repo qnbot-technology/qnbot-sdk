@@ -1,0 +1,2 @@
+qnbot-sdk-exo
+qnbot-sdk-glove

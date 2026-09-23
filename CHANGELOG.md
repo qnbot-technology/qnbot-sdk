@@ -2,6 +2,19 @@
 
 本文件记录 QnBot SDK 示例和安装包交付的变化。
 
+## 1.3.0 - 2026-09-23
+
+- 与 SDK 1.3.0 的采集、标定、设备接入和算法包使用流程保持一致。
+- 公开示例继续提供 Linux x86_64、Linux ARM64、macOS ARM64 和 Windows x86_64 四平台入口。
+
+## 未发布
+
+- 公开示例按组件重新组织为 `glove/` 与 `exo/`，每个组件各自提供独立的 Python 和 C++ 工程；此前 `examples/python/` 和 `examples/cpp/` 下的示例路径全部变更。
+- 新增 Exo 外骨骼组件的 Python 和 C++ 示例：设备发现、快速运行、设备信息、遥测与状态、IMU、手柄、触觉反馈和多设备生命周期。
+- 新增 `composite-exo-glove/` Python 与 C++ 公共示例，覆盖共享串口自动发现、显式串口、成员信息、遥测、IMU、Exo 触觉和生命周期。
+- 删除 bindings 与 Rust crate 中重复的 Exo 客户示例，统一从 `exo/` 获取。
+- Glove 示例的程序行为、参数和输出保持不变。
+
 ## 1.2.0 - 2026-09-15
 
 - 算法包统一通过 QnBot CLI 在线查找和安装，并由 package ID 表示客户选择。
