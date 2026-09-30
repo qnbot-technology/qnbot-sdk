@@ -8,26 +8,25 @@ int main(int argc, char** argv) {
     try {
         qnbot::Sdk sdk(
             example::composite_config(example::parse_port(argc, argv)));
-        auto glove_domain = sdk.glove();
-        auto exo_domain = sdk.exo();
-        auto glove = glove_domain.device("glove");
-        auto exo = exo_domain.device("exo");
-        glove_domain.start();
-        exo_domain.start();
-        static_cast<void>(glove_domain.update());
-        static_cast<void>(exo_domain.update());
-        const auto pose = glove.pose().latest();
-        const auto telemetry = exo.telemetry().latest();
+        auto glove = sdk.glove();
+        auto exo = sdk.exo();
+        auto left_glove_device = glove.device(qnbot::Side::left);
+        auto right_glove_device = glove.device(qnbot::Side::right);
+        auto exo_device = exo.device();
+        sdk.start();
+        static_cast<void>(sdk.update());
+        const auto left_pose = left_glove_device.pose().latest();
+        const auto right_pose = right_glove_device.pose().latest();
+        const auto telemetry = exo_device.telemetry().latest();
         std::cout << "started composite device; glove_pose="
-                  << (pose ? "available" : "waiting")
+                  << (left_pose ? "available" : "waiting") << "/"
+                  << (right_pose ? "available" : "waiting")
                   << " exo_telemetry=" << (telemetry ? "available" : "waiting")
                   << '\n';
-        glove_domain.stop();
-        exo_domain.stop();
+        sdk.stop();
         std::cout << "stopped composite device\n";
-        glove_domain.close();
-        exo_domain.close();
-        std::cout << "closed member domains\n";
+        sdk.close();
+        std::cout << "closed SDK\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         return example::report_error(error);

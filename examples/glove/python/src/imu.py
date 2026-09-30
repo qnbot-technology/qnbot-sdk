@@ -35,12 +35,15 @@ def main() -> None:
         )
     )
     glove = sdk.glove()
-    imu = glove.device().imu()
-    _imu_subscription = imu.subscribe(print_imu)
+    device = glove.device()
 
-    glove.start()
-    print("running; press Ctrl+C to stop", flush=True)
-    glove.run_forever()
+    try:
+        device.imu().subscribe(print_imu)
+        glove.start()
+        print("running; press Ctrl+C to stop")
+        glove.run_forever()
+    finally:
+        glove.close()
 
 
 if __name__ == "__main__":

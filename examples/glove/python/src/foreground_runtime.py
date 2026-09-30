@@ -4,7 +4,6 @@ import argparse
 
 from qnbot_sdk import (
     DeviceSelector,
-    Health,
     Sample,
     Sdk,
     SerialConnection,
@@ -14,45 +13,10 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
 
-DEFAULT_TARGET_NAME = "openxr_hand"
-
-
-def create_sdk(port: str, side: Side, target_name: str, package_id: str) -> Sdk:
-    source = DeviceSelector(type="glove", name="primary")
-    return Sdk(
-        devices=(
-            GloveConfig(
-                name="primary",
-                side=side,
-                connection=SerialConnection(port=port),
-            ),
-        ),
-        targets=(
-            TargetConfig(
-                name=target_name,
-                side=side,
-                source=source,
-                algorithms=(TargetAlgorithm(id=package_id),),
-            ),
-        ),
-    )
-
-
 def print_output(sample: Sample[HandJointCommand]) -> None:
     print(
         f"retargeting sequence={sample.sequence} "
         f"target={sample.value.target} joints={sample.value.joints}"
-    )
-
-
-def print_health(label: str, health: Health) -> None:
-    devices = ", ".join(
-        f"{source_id}(connected={device.connected}, stale={device.stale})"
-        for source_id, device in health.devices.items()
-    )
-    print(
-        f"{label} health ok={health.ok} warnings={health.warning_count} "
-        f"errors={health.error_count} devices=[{devices}]"
     )
 
 
@@ -67,24 +31,36 @@ def main() -> None:
         required=True,
         help="Physical glove side",
     )
-    arguments.add_argument("--target-name", default=DEFAULT_TARGET_NAME)
     arguments.add_argument("--package-id", required=True)
     options = arguments.parse_args()
 
-    sdk = create_sdk(
-        options.port,
-        Side(options.side),
-        options.target_name,
-        options.package_id,
+    side = Side(options.side)
+    source = DeviceSelector(type="glove", side=side)
+    sdk = Sdk(
+        devices=(
+            GloveConfig(
+                side=side,
+                connection=SerialConnection(port=options.port),
+            ),
+        ),
+        targets=(
+            TargetConfig(
+                name="openxr_hand",
+                side=side,
+                source=source,
+                algorithms=(TargetAlgorithm(id=options.package_id),),
+            ),
+        ),
     )
     glove = sdk.glove()
-    output = glove.device().output(name=options.target_name)
-    output.subscribe(print_output)
-    glove.start()
-    print_health("running", glove.health())
-
-    print("running; press Ctrl+C to stop", flush=True)
-    glove.run_forever()
+    device = glove.device()
+    try:
+        device.output(name="openxr_hand").subscribe(print_output)
+        glove.start()
+        print("running; press Ctrl+C to stop")
+        glove.run_forever()
+    finally:
+        glove.close()
 
 
 if __name__ == "__main__":

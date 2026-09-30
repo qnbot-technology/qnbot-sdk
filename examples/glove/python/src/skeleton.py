@@ -41,13 +41,17 @@ def main() -> None:
         )
     )
     glove = sdk.glove()
-    skeleton = glove.device().skeleton()
+    device = glove.device()
+    skeleton = device.skeleton()
     skeleton.joint_angles().subscribe(print_joint_angles)
     skeleton.pose().subscribe(print_pose)
 
-    glove.start()
-    print("running; press Ctrl+C to stop", flush=True)
-    glove.run_forever()
+    try:
+        glove.start()
+        print("running; press Ctrl+C to stop")
+        glove.run_forever()
+    finally:
+        glove.close()
 
 
 if __name__ == "__main__":

@@ -2,31 +2,9 @@ from __future__ import annotations
 
 import argparse
 
-from qnbot_sdk import CompositeExoGloveConfig, Sample, Sdk, SerialConnection
+from qnbot_sdk import CompositeExoGloveConfig, Sample, Sdk, SerialConnection, Side
 from qnbot_sdk.exo import ExoConfig, ExoTelemetry
-from qnbot_sdk.glove import GloveConfig, GloveImu
-
-EXO_NAME = "exo"
-GLOVE_NAME = "glove"
-
-
-def create_sdk(port: str) -> Sdk:
-    return Sdk(
-        devices=(
-            CompositeExoGloveConfig(
-                connection=SerialConnection(port=port),
-                devices=(GloveConfig(name=GLOVE_NAME), ExoConfig(name=EXO_NAME)),
-            ),
-        )
-    )
-
-
-def print_glove_imu(sample: Sample[GloveImu]) -> None:
-    imu = sample.value.payload
-    print(
-        f"glove imu sequence={sample.sequence} valid={imu.valid} "
-        f"gyro={imu.gyroscope_raw} accel={imu.accelerometer_raw}"
-    )
+from qnbot_sdk.glove import GloveConfig
 
 
 def print_exo_imu(sample: Sample[ExoTelemetry]) -> None:
@@ -41,29 +19,39 @@ def print_exo_imu(sample: Sample[ExoTelemetry]) -> None:
 
 
 def main() -> None:
-    arguments = argparse.ArgumentParser(description="Read Glove and Exo IMU data")
+    arguments = argparse.ArgumentParser(description="Read Exo IMU data on a composite link")
     arguments.add_argument("--port", required=True, help="Shared serial port")
     options = arguments.parse_args()
 
-    sdk = create_sdk(port=options.port)
+    sdk = Sdk(
+        devices=(
+            CompositeExoGloveConfig(
+                connection=SerialConnection(port=options.port),
+                devices=(
+                    GloveConfig(side=Side.LEFT),
+                    GloveConfig(side=Side.RIGHT),
+                    ExoConfig(),
+                ),
+            ),
+        )
+    )
     try:
-        glove_domain = sdk.glove()
-        exo_domain = sdk.exo()
-        glove = glove_domain.device(GLOVE_NAME)
-        exo = exo_domain.device(EXO_NAME)
-        glove.imu().subscribe(print_glove_imu)
-        exo.telemetry().subscribe(print_exo_imu)
-        glove_domain.start()
-        exo_domain.start()
-        print("running; press Ctrl+C to stop", flush=True)
+        glove = sdk.glove()
+        exo = sdk.exo()
+        exo_device = exo.device()
+        print(
+            "Glove raw IMU (Telemetry.ImuRawSnapshot, 0x10/0x81) is not exposed "
+            "on the composite CDC path; reading Exo IMU only",
+        )
+        exo_device.telemetry().subscribe(print_exo_imu)
+        sdk.start()
+        print("running; press Ctrl+C to stop")
         # The aggregate runner is required to drive both member domains.
         sdk.run_forever()
     except KeyboardInterrupt:
-        glove_domain.stop()
-        exo_domain.stop()
+        sdk.stop()
     finally:
-        glove_domain.close()
-        exo_domain.close()
+        sdk.close()
 
 
 if __name__ == "__main__":

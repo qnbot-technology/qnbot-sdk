@@ -25,30 +25,26 @@ void print_imu(const std::string& label,
 int main(int argc, char** argv) {
     try {
         std::string port;
-        std::string name = "primary";
         for (int index = 1; index < argc; ++index) {
             const std::string argument = argv[index];
             if (argument == "--port") {
                 port = example::require_value(argc, argv, index, argument);
-            } else if (argument == "--name") {
-                name = example::require_value(argc, argv, index, argument);
             } else {
                 throw std::invalid_argument("unknown argument: " + argument);
             }
         }
         if (port.empty()) throw std::invalid_argument("--port is required");
 
-        qnbot::Sdk sdk(example::serial_config(port, name));
+        qnbot::Sdk sdk(example::serial_config(port));
         auto exo = sdk.exo();
-        auto device = exo.device(name);
+        auto device = exo.device();
         if (!device.get_device_info().capabilities.imus) {
             std::cout << "this device reports no IMU" << std::endl;
             exo.close();
             return EXIT_SUCCESS;
         }
 
-        auto telemetry = device.telemetry();
-        const auto subscription = telemetry.subscribe(
+        const auto subscription = device.telemetry().subscribe(
             [](const qnbot::Sample<qnbot::ExoTelemetry>& sample) {
                 print_imu("torso", sample.value.payload.torso_imu);
                 print_imu("extra", sample.value.payload.extra_imu);

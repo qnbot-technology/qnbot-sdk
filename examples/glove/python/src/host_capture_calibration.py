@@ -45,30 +45,6 @@ def configured_targets(package_ids: tuple[str, ...]) -> tuple[tuple[str, str], .
     return tuple(targets)
 
 
-def create_sdk(package_ids: tuple[str, ...]) -> Sdk:
-    configured = configured_targets(package_ids)
-    return Sdk(
-        devices=(
-            GloveConfig(name=LEFT_SOURCE, side=Side.LEFT),
-            GloveConfig(name=RIGHT_SOURCE, side=Side.RIGHT),
-        ),
-        targets=tuple(
-            TargetConfig(
-                name=target_name,
-                side=side,
-                source=DeviceSelector(type="glove", name=source),
-                algorithms=(TargetAlgorithm(id=package_id),),
-            )
-            for package_id, target_name in configured
-            if package_id != BUILTIN_SKELETON_PACKAGE_ID
-            for side, source in (
-                (Side.LEFT, LEFT_SOURCE),
-                (Side.RIGHT, RIGHT_SOURCE),
-            )
-        ),
-    )
-
-
 def select_target(package_ids: tuple[str, ...]) -> str:
     targets = configured_targets(package_ids)
     if len(targets) == 1:
@@ -219,7 +195,27 @@ def main() -> None:
     options = arguments.parse_args()
     package_ids = tuple(dict.fromkeys(options.package_ids))
 
-    sdk = create_sdk(package_ids)
+    configured = configured_targets(package_ids)
+    sdk = Sdk(
+        devices=(
+            GloveConfig(name=LEFT_SOURCE, side=Side.LEFT),
+            GloveConfig(name=RIGHT_SOURCE, side=Side.RIGHT),
+        ),
+        targets=tuple(
+            TargetConfig(
+                name=target_name,
+                side=side,
+                source=DeviceSelector(type="glove", name=source),
+                algorithms=(TargetAlgorithm(id=package_id),),
+            )
+            for package_id, target_name in configured
+            if package_id != BUILTIN_SKELETON_PACKAGE_ID
+            for side, source in (
+                (Side.LEFT, LEFT_SOURCE),
+                (Side.RIGHT, RIGHT_SOURCE),
+            )
+        ),
+    )
     glove = sdk.glove()
     left_device = glove.device(LEFT_SOURCE)
     right_device = glove.device(RIGHT_SOURCE)

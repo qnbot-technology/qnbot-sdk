@@ -18,7 +18,7 @@ def main() -> None:
     device.telemetry().subscribe(print_telemetry)
 
     exo.start()
-    print("running; press Ctrl+C to stop", flush=True)
+    print("running; press Ctrl+C to stop")
     exo.run_forever()
 
 

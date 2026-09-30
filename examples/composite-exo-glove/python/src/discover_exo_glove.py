@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from qnbot_sdk import CompositeExoGloveConfig, QnBotError, Sdk, SerialConnection
+from qnbot_sdk import CompositeExoGloveConfig, QnBotError, Sdk, SerialConnection, Side
 from qnbot_sdk.exo import ExoConfig
 from qnbot_sdk.glove import GloveConfig
-
-EXO_NAME = "exo"
-GLOVE_NAME = "glove"
 
 
 def main() -> None:
@@ -13,26 +10,24 @@ def main() -> None:
         devices=(
             CompositeExoGloveConfig(
                 connection=SerialConnection(auto_discover=True),
-                devices=(GloveConfig(name=GLOVE_NAME), ExoConfig(name=EXO_NAME)),
+                devices=(
+                    GloveConfig(side=Side.LEFT),
+                    GloveConfig(side=Side.RIGHT),
+                    ExoConfig(),
+                ),
             ),
         )
     )
     try:
-        glove_domain = sdk.glove()
-        exo_domain = sdk.exo()
-        glove = glove_domain.device(GLOVE_NAME)
-        exo = exo_domain.device(EXO_NAME)
+        glove = sdk.glove()
+        exo = sdk.exo()
+        left_glove_device = glove.device(side=Side.LEFT)
+        right_glove_device = glove.device(side=Side.RIGHT)
+        exo_device = exo.device()
+        print(f"Left Glove discovered source={left_glove_device.source_id}")
+        print(f"Right Glove discovered source={right_glove_device.source_id}")
         try:
-            glove_info = glove.get_device_info()
-            print(
-                "Glove discovered "
-                f"sn={glove_info.canonical_sn} model={glove_info.model} "
-                f"hand={glove_info.hand.value} firmware={glove_info.firmware_version}"
-            )
-        except QnBotError as error:
-            print(f"Glove discovery error: {error}")
-        try:
-            exo_info = exo.get_device_info()
+            exo_info = exo_device.get_device_info()
             print(
                 "Exo discovered "
                 f"product={exo_info.product.name} sn={exo_info.serial_number} "
@@ -41,8 +36,7 @@ def main() -> None:
         except QnBotError as error:
             print(f"Exo discovery error: {error}")
     finally:
-        glove_domain.close()
-        exo_domain.close()
+        sdk.close()
 
 
 if __name__ == "__main__":

@@ -1,47 +1,55 @@
 from __future__ import annotations
 
-import argparse
-
-from qnbot_sdk import CompositeExoGloveConfig, Sdk, SerialConnection
+from qnbot_sdk import CompositeExoGloveConfig, Sdk, Side
 from qnbot_sdk.exo import ExoConfig
 from qnbot_sdk.glove import GloveConfig
 
-EXO_NAME = "exo"
-GLOVE_NAME = "glove"
-
 
 def main() -> None:
-    arguments = argparse.ArgumentParser(
-        description="Start a combined Exo and Glove SDK"
-    )
-    arguments.add_argument("--port", required=True, help="Shared serial port")
-    options = arguments.parse_args()
-
     sdk = Sdk(
         devices=(
             CompositeExoGloveConfig(
-                connection=SerialConnection(port=options.port),
-                devices=(GloveConfig(name=GLOVE_NAME), ExoConfig(name=EXO_NAME)),
+                devices=(
+                    GloveConfig(side=Side.LEFT),
+                    GloveConfig(side=Side.RIGHT),
+                    ExoConfig(),
+                ),
             ),
         )
     )
     try:
-        glove_domain = sdk.glove()
-        exo_domain = sdk.exo()
-        glove = glove_domain.device(GLOVE_NAME)
-        exo = exo_domain.device(EXO_NAME)
-        glove_domain.start()
-        exo_domain.start()
-        print(f"started Glove={glove.source_id} Exo={exo.source_id}", flush=True)
-        print("press Ctrl+C to stop", flush=True)
-        # The aggregate runner is required to drive both member domains.
+        glove = sdk.glove()
+        exo = sdk.exo()
+        left_glove_device = glove.device(side=Side.LEFT)
+        right_glove_device = glove.device(side=Side.RIGHT)
+        exo_device = exo.device()
+        left_glove_device.pose().subscribe(
+            lambda sample: print(
+                f"left glove pose sequence={sample.sequence} "
+                f"fingertips={len(sample.value.payload.fingertip_local)}"
+            )
+        )
+        right_glove_device.pose().subscribe(
+            lambda sample: print(
+                f"right glove pose sequence={sample.sequence} "
+                f"fingertips={len(sample.value.payload.fingertip_local)}"
+            )
+        )
+        sdk.start()
+        print(
+            f"started Left Glove={left_glove_device.source_id} "
+            f"Right Glove={right_glove_device.source_id} "
+            f"Exo={exo_device.source_id}",
+        )
+        print("press Ctrl+C to stop")
+        # There are no work targets here, so the taskless runtime waits
+        # until Ctrl+C requests a stop. The root SDK lifecycle drives both
+        # member domains through one SDK instance.
         sdk.run_forever()
     except KeyboardInterrupt:
-        glove_domain.stop()
-        exo_domain.stop()
+        sdk.stop()
     finally:
-        glove_domain.close()
-        exo_domain.close()
+        sdk.close()
 
 
 if __name__ == "__main__":

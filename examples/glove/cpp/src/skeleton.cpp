@@ -28,7 +28,8 @@ int main(int argc, char** argv) {
         qnbot::Sdk sdk(example::serial_config(port, *side));
         auto glove = sdk.glove();
 
-        auto skeleton = glove.device().skeleton();
+        auto device = glove.device();
+        auto skeleton = device.skeleton();
         const auto joint_angles_subscription =
             skeleton.joint_angles().subscribe(
                 [](const qnbot::Sample<qnbot::HandJointCommand>& sample) {
@@ -50,11 +51,17 @@ int main(int argc, char** argv) {
                           << pose.positions_local[9][2] << "]\n";
             });
 
-        glove.start();
-        std::cout << "running; press Ctrl+C to stop" << std::endl;
-        glove.run_forever();
+        try {
+            glove.start();
+            std::cout << "running; press Ctrl+C to stop" << std::endl;
+            glove.run_forever();
+        } catch (...) {
+            glove.close();
+            throw;
+        }
         static_cast<void>(joint_angles_subscription);
         static_cast<void>(pose_subscription);
+        glove.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         return example::report_error(error);

@@ -27,30 +27,26 @@ void print_handsets(const qnbot::Sample<qnbot::ExoTelemetry>& sample) {
 int main(int argc, char** argv) {
     try {
         std::string port;
-        std::string name = "primary";
         for (int index = 1; index < argc; ++index) {
             const std::string argument = argv[index];
             if (argument == "--port") {
                 port = example::require_value(argc, argv, index, argument);
-            } else if (argument == "--name") {
-                name = example::require_value(argc, argv, index, argument);
             } else {
                 throw std::invalid_argument("unknown argument: " + argument);
             }
         }
         if (port.empty()) throw std::invalid_argument("--port is required");
 
-        qnbot::Sdk sdk(example::serial_config(port, name));
+        qnbot::Sdk sdk(example::serial_config(port));
         auto exo = sdk.exo();
-        auto device = exo.device(name);
+        auto device = exo.device();
         if (!device.get_device_info().capabilities.handsets) {
             std::cout << "this device reports no handset" << std::endl;
             exo.close();
             return EXIT_SUCCESS;
         }
 
-        auto telemetry = device.telemetry();
-        const auto subscription = telemetry.subscribe(print_handsets);
+        const auto subscription = device.telemetry().subscribe(print_handsets);
 
         exo.start();
         std::cout << "running; press Ctrl+C to stop" << std::endl;

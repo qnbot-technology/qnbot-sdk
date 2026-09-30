@@ -6,10 +6,6 @@ from qnbot_sdk import Sdk, SerialConnection
 from qnbot_sdk.exo import ExoConfig, ExoDeviceInfo
 
 
-def create_sdk(port: str, name: str) -> Sdk:
-    return Sdk(devices=(ExoConfig(name=name, connection=SerialConnection(port=port)),))
-
-
 def print_info(info: ExoDeviceInfo) -> None:
     print(
         f"product={info.product.name} "
@@ -38,12 +34,13 @@ def main() -> None:
         description="Read Exo device information before start"
     )
     arguments.add_argument("--port", required=True, help="Serial port for the device")
-    arguments.add_argument("--name", default="primary", help="Logical device name")
     options = arguments.parse_args()
 
-    sdk = create_sdk(options.port, options.name)
+    sdk = Sdk(
+        devices=(ExoConfig(connection=SerialConnection(port=options.port)),)
+    )
     exo = sdk.exo()
-    device = exo.device(options.name)
+    device = exo.device()
     print_info(device.get_device_info())
     exo.close()
 

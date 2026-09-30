@@ -4,22 +4,30 @@
 #include <exception>
 #include <iostream>
 
-int main(int argc, char** argv) {
+int main() {
     try {
-        const auto port = example::parse_port(argc, argv);
-        qnbot::Sdk sdk(example::composite_config(port));
-        auto glove_domain = sdk.glove();
-        auto exo_domain = sdk.exo();
-        auto glove = glove_domain.device("glove");
-        auto exo = exo_domain.device("exo");
-        const auto pose_subscription = glove.pose().subscribe(
+        qnbot::Sdk sdk(example::composite_config());
+        auto glove = sdk.glove();
+        auto exo = sdk.exo();
+        auto left_glove_device = glove.device(qnbot::Side::left);
+        auto right_glove_device = glove.device(qnbot::Side::right);
+        auto exo_device = exo.device();
+        const auto left_pose_subscription = left_glove_device.pose().subscribe(
             [](const qnbot::Sample<qnbot::GlovePose>& sample) {
-                std::cout << "glove pose sequence=" << sample.sequence
+                std::cout << "left glove pose sequence=" << sample.sequence
                           << " fingertips="
                           << sample.value.payload.fingertip_local.size()
                           << '\n';
             });
-        const auto telemetry_subscription = exo.telemetry().subscribe(
+        const auto right_pose_subscription =
+            right_glove_device.pose().subscribe(
+                [](const qnbot::Sample<qnbot::GlovePose>& sample) {
+                    std::cout << "right glove pose sequence=" << sample.sequence
+                              << " fingertips="
+                              << sample.value.payload.fingertip_local.size()
+                              << '\n';
+                });
+        const auto telemetry_subscription = exo_device.telemetry().subscribe(
             [](const qnbot::Sample<qnbot::ExoTelemetry>& sample) {
                 std::cout << "exo telemetry sequence=" << sample.sequence
                           << " left_arm_joints=";
@@ -28,13 +36,16 @@ int main(int argc, char** argv) {
                 std::cout << '\n';
             });
 
-        glove_domain.start();
-        exo_domain.start();
+        sdk.start();
         std::cout << "running shared composite link; press Ctrl+C to stop\n";
-        // The aggregate runner is required here because this example drives
-        // both member domains through one SDK instance.
+        // There are no work targets in this example, so the taskless
+        // runtime stays alive until the caller requests a stop.
+        // The root SDK lifecycle drives both member domains.
         sdk.run_forever();
-        static_cast<void>(pose_subscription);
+        sdk.stop();
+        sdk.close();
+        static_cast<void>(left_pose_subscription);
+        static_cast<void>(right_pose_subscription);
         static_cast<void>(telemetry_subscription);
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

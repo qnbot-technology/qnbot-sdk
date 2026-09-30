@@ -36,7 +36,7 @@ cmake --build build --config Release
 ```
 
 该示例无需参数：SDK 自动发现唯一连接的设备，持续打印遥测；按 `Ctrl+C` 停止。没有发现
-设备或同时发现多台设备时，先运行 `discover_exos`，再使用支持显式设备参数的示例。
+设备或同时发现多台设备时，先运行 `discover_exos`，再使用支持 `--port` 的示例。
 
 ## 示例列表
 
@@ -76,7 +76,6 @@ Windows 请将串口替换为实际的 `COM` 端口，例如 `--port COM3`。
 ## 参数说明
 
 - `--port`：设备串口；使用该参数的示例必须显式提供。
-- `--name`：应用为设备指定的名称，默认 `primary`。
 - `--left`、`--right`：`haptics` 的左右触觉强度，取值为 0 到 100。
 - `--hold`：`haptics` 保持触觉的时间，单位为秒。
 - `--first-port`、`--second-port`：`device_lifecycle` 使用的两个串口。

@@ -42,8 +42,7 @@ qnbot::SdkConfig make_config(const Options& options) {
     qnbot::TargetConfig target;
     target.name = "primary";
     target.side = options.side;
-    target.source =
-        qnbot::DeviceSelector{"glove", std::string("primary"), std::nullopt};
+    target.source = qnbot::DeviceSelector{"glove", std::nullopt, options.side};
     target.algorithms = {qnbot::TargetAlgorithm{options.package_id}};
     config.targets.push_back(target);
     target.name = "backup";
@@ -59,25 +58,29 @@ int main(int argc, char** argv) {
         qnbot::Sdk sdk(make_config(options));
         auto glove = sdk.glove();
 
-        auto device = glove.device("primary");
-        auto primary = device.output("primary");
-        auto backup = device.output("backup");
-        const auto primary_subscription = primary.subscribe(
+        auto device = glove.device();
+        const auto primary_subscription = device.output("primary").subscribe(
             [](const qnbot::Sample<qnbot::HandJointCommand>& sample) {
                 std::cout << "primary ";
                 example::print_output(sample);
             });
-        const auto backup_subscription = backup.subscribe(
+        const auto backup_subscription = device.output("backup").subscribe(
             [](const qnbot::Sample<qnbot::HandJointCommand>& sample) {
                 std::cout << "backup ";
                 example::print_output(sample);
             });
 
-        glove.start();
-        std::cout << "running; press Ctrl+C to stop" << std::endl;
-        glove.run_forever();
+        try {
+            glove.start();
+            std::cout << "running; press Ctrl+C to stop" << std::endl;
+            glove.run_forever();
+        } catch (...) {
+            glove.close();
+            throw;
+        }
         static_cast<void>(primary_subscription);
         static_cast<void>(backup_subscription);
+        glove.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         return example::report_error(error);

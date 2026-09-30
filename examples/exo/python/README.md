@@ -71,7 +71,6 @@ Windows 请将串口替换为实际的 `COM` 端口，例如 `--port COM3`。
 ## 参数说明
 
 - `--port`：设备串口；使用该参数的示例必须显式提供。
-- `--name`：应用为设备指定的名称，默认 `primary`。
 - `--left`、`--right`：`haptics.py` 的左右触觉强度，取值为 0 到 100。
 - `--hold`：`haptics.py` 保持触觉的时间，单位为秒。
 - `--first-port`、`--second-port`：`device_lifecycle.py` 使用的两个串口。

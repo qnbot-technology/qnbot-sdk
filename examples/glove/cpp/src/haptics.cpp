@@ -13,7 +13,8 @@ int main(int argc, char** argv) {
         auto glove = sdk.glove();
         glove.start();
 
-        auto haptics = glove.device("primary").haptics();
+        auto device = glove.device();
+        auto haptics = device.haptics();
         haptics.set(qnbot::Haptics{{
             {qnbot::GloveFinger::thumb, 80},
             {qnbot::GloveFinger::index, 40},

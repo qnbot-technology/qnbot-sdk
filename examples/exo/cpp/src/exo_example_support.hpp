@@ -55,11 +55,9 @@ inline std::uint8_t parse_strength(const std::string& text,
     return static_cast<std::uint8_t>(value);
 }
 
-inline qnbot::SdkConfig serial_config(const std::string& port,
-                                      const std::string& name) {
+inline qnbot::SdkConfig serial_config(const std::string& port) {
     qnbot::ExoConfig exo;
     exo.connection.port = port;
-    exo.name = name;
 
     qnbot::SdkConfig config;
     config.devices.push_back(exo);
