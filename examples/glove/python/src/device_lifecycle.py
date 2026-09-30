@@ -27,50 +27,6 @@ from qnbot_sdk.glove import (
     HandJointCommand,
 )
 
-DEFAULT_TARGET_NAME = "openxr_hand"
-
-
-def create_sdk(
-    left_port: str,
-    right_port: str,
-    target_name: str,
-    package_id: str,
-) -> Sdk:
-    return Sdk(
-        devices=(
-            GloveConfig(
-                name="left",
-                side=Side.LEFT,
-                connection=SerialConnection(port=left_port),
-            ),
-            GloveConfig(
-                name="right",
-                side=Side.RIGHT,
-                connection=SerialConnection(port=right_port),
-            ),
-        ),
-        targets=(
-            TargetConfig(
-                name=target_name,
-                side=Side.LEFT,
-                source=DeviceSelector(type="glove", name="left"),
-                algorithms=(TargetAlgorithm(id=package_id),),
-            ),
-            TargetConfig(
-                name=target_name,
-                side=Side.RIGHT,
-                source=DeviceSelector(type="glove", name="right"),
-                algorithms=(TargetAlgorithm(id=package_id),),
-            ),
-        ),
-        algorithms=AlgorithmsConfig(
-            capture=CaptureConfig(
-                interaction=CaptureInteractionMode.EXTERNAL,
-            ),
-        ),
-    )
-
-
 def print_output(device_name: str, sample: Sample[HandJointCommand]) -> None:
     print(
         f"{device_name} retargeting sequence={sample.sequence} "
@@ -122,28 +78,54 @@ def main() -> None:
     arguments.add_argument("--left-port", required=True)
     arguments.add_argument("--right-port", required=True)
     arguments.add_argument("--updates", type=int, default=10)
-    arguments.add_argument("--target-name", default=DEFAULT_TARGET_NAME)
     arguments.add_argument("--package-id", required=True)
     options = arguments.parse_args()
     if options.updates < 1:
         arguments.error("--updates must be at least 1")
 
-    sdk = create_sdk(
-        options.left_port,
-        options.right_port,
-        options.target_name,
-        options.package_id,
+    sdk = Sdk(
+        devices=(
+            GloveConfig(
+                name="left",
+                side=Side.LEFT,
+                connection=SerialConnection(port=options.left_port),
+            ),
+            GloveConfig(
+                name="right",
+                side=Side.RIGHT,
+                connection=SerialConnection(port=options.right_port),
+            ),
+        ),
+        targets=(
+            TargetConfig(
+                name="openxr_hand",
+                side=Side.LEFT,
+                source=DeviceSelector(type="glove", name="left"),
+                algorithms=(TargetAlgorithm(id=options.package_id),),
+            ),
+            TargetConfig(
+                name="openxr_hand",
+                side=Side.RIGHT,
+                source=DeviceSelector(type="glove", name="right"),
+                algorithms=(TargetAlgorithm(id=options.package_id),),
+            ),
+        ),
+        algorithms=AlgorithmsConfig(
+            capture=CaptureConfig(
+                interaction=CaptureInteractionMode.EXTERNAL,
+            ),
+        ),
     )
     glove = sdk.glove()
 
     left = glove.device(name="left")
     right = glove.device(side=Side.RIGHT)
-    left_output = left.output(name=options.target_name)
-    right_output = right.output(name=options.target_name)
+    left_output = left.output(name="openxr_hand")
+    right_output = right.output(name="openxr_hand")
     left_capture_progress = left.capture_progress()
     right_capture_progress = right.capture_progress()
-    left_calibration_progress = left.calibration_progress(name=options.target_name)
-    right_calibration_progress = right.calibration_progress(name=options.target_name)
+    left_calibration_progress = left.calibration_progress(name="openxr_hand")
+    right_calibration_progress = right.calibration_progress(name="openxr_hand")
     left_capture_control = left.capture_control()
     right_capture_control = right.capture_control()
     left.start()
@@ -238,11 +220,6 @@ def main() -> None:
     print("right output after restart")
     print_output("right", right_sample)
 
-    health = glove.health()
-    print(
-        f"health ok={health.ok} warnings={health.warning_count} "
-        f"errors={health.error_count}"
-    )
     glove.close()
 
 

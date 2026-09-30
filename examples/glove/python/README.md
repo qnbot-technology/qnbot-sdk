@@ -67,8 +67,9 @@ python src/quick_start.py
 | `external_input_manual_update.py` | 否 | 是 | 由应用提供手套帧，并由应用手动更新 |
 | `skeleton.py` | 是 | 否 | 读取手部骨骼数据 |
 | `quick_start.py` | 是 | 否 | 零参数读取单只手套姿态 |
+| `time_sync.py` | 是 | 否 | 在后台运行并定期使用外部时间源提供的 Unix 毫秒时间同步 Glove 时钟后读取姿态 |
 | `imu.py` | 是 | 否 | 读取有线 IMU 原始计数 |
-| `manual_runtime.py` | 是 | 是 | 由应用控制每次更新，并等待下一项 SDK 工作 |
+| `manual_runtime.py` | 是 | 是 | 由应用控制每次更新 |
 | `foreground_runtime.py` | 是 | 是 | 在当前线程持续运行 |
 | `background_runtime.py` | 是 | 是 | 在后台运行并主动停止 |
 | `async_runtime.py` | 是 | 是 | 使用 `asyncio` 异步读取输出 |
@@ -78,11 +79,9 @@ python src/quick_start.py
 | `haptics.py` | 是 | 否 | 设置并清除触觉反馈 |
 | `host_capture_calibration.py` | 是，两只 | 是 | 完成左右手采集并保存、应用标定结果 |
 
-两个 external input 示例都需要显式提供算法包：后台示例适合普通应用，手动更新示例适合
-由应用控制每次更新的循环。使用算法包的示例必须显式传入 `--package-id`，两个 external
-input 示例也不例外。以 `update()` 推进调度的示例在每次 `update()` 后用 `update.sleep()`
-等待下一项 SDK 工作；`external_input_manual_update.py` 同样在 `update.sleep()` 返回
-`NO_TASKS` 时短暂让出，以保持持续提交外部帧的节奏。
+两个 external input 示例都需要显式提供算法包，并由应用确认外部采集阶段：后台示例让 SDK 在后台处理运行任务，手动更新示例适合由应用控制每次更新的循环。使用算法包的示例必须显式传入 `--package-id`，两个 external input 示例也不例外。
+
+手动更新示例会等待每次更新完成，再读取当前输出。
 
 ## 常用命令
 
@@ -92,6 +91,7 @@ python src/external_input_run_background.py --package-id <package-id>
 python src/external_input_manual_update.py --package-id <package-id>
 python src/skeleton.py --port /dev/ttyUSB0 --side left
 python src/quick_start.py
+python src/time_sync.py
 python src/imu.py --port /dev/ttyUSB0 --side left
 python src/manual_runtime.py --port /dev/ttyUSB0 --side left --package-id <package-id> --updates 100
 python src/foreground_runtime.py --port /dev/ttyUSB0 --side left --package-id <package-id>
@@ -103,6 +103,9 @@ python src/device_lifecycle.py --left-port /dev/ttyUSB0 --right-port /dev/ttyUSB
 python src/haptics.py --port /dev/ttyUSB0 --side left --hold 1
 python src/host_capture_calibration.py --package-id <package-id>
 ```
+
+`time_sync.py` 使用后台运行模式，每隔 1 秒重新获取一次外部时间源的 Unix 毫秒时间戳并调用
+`glove.sync_time(reference_time_ms)`。传入参数的单位是毫秒，不是纳秒；按 `Ctrl+C` 停止。
 
 Windows 请将串口替换为实际的 `COM` 端口，例如 `--port COM3`。
 
@@ -129,7 +132,6 @@ python src/host_capture_calibration.py \
 - `--port`：手套串口；使用 `--port` 的参数化示例必须显式提供串口。
 - `--side`：手套物理侧，取值为 `left` 或 `right`。
 - `--package-id`：已经安装的目标手算法包 ID；该参数不会安装算法包。
-- `--target-name`：应用为输出指定的名称。
 - `--force`：`host_capture_calibration.py` 忽略可复用采集并重新采集。
 - `--detail`、`--sample-rate`：控制 `debug_trace.py` 的诊断日志详细程度和采样率。
 

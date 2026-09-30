@@ -43,20 +43,19 @@ inline std::string parse_port(int argc, char** argv) {
 
 inline qnbot::SdkConfig
 composite_config(std::optional<std::string> port = std::nullopt) {
-    qnbot::GloveConfig glove;
-    glove.name = "glove";
-    glove.side = qnbot::Side::right;
+    qnbot::GloveConfig left_glove;
+    left_glove.side = qnbot::Side::left;
+
+    qnbot::GloveConfig right_glove;
+    right_glove.side = qnbot::Side::right;
 
     qnbot::ExoConfig exo;
-    exo.name = "exo";
 
     qnbot::CompositeExoGloveConfig composite;
-    if (port) {
-        composite.connection.port = std::move(*port);
-    } else {
-        composite.connection.auto_discover = true;
-    }
-    composite.devices = {qnbot::DeviceConfig{glove}, qnbot::DeviceConfig{exo}};
+    if (port) composite.connection.port = std::move(*port);
+    composite.devices = {qnbot::DeviceConfig{left_glove},
+                         qnbot::DeviceConfig{right_glove},
+                         qnbot::DeviceConfig{exo}};
 
     qnbot::SdkConfig config;
     config.devices.push_back(composite);
@@ -64,8 +63,7 @@ composite_config(std::optional<std::string> port = std::nullopt) {
 }
 
 inline void print_glove_info(const qnbot::GloveDeviceInfo& info) {
-    std::cout << "glove sn=" << info.canonical_sn
-              << " type=" << info.device_type << " model=" << info.model
+    std::cout << "glove type=" << info.device_type << " model=" << info.model
               << " firmware=" << info.firmware_version
               << " hand=" << (info.hand == qnbot::Side::left ? "left" : "right")
               << '\n';

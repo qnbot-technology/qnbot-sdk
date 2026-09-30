@@ -20,7 +20,6 @@ struct SerialOptions {
     double seconds{1.0};
     std::uint64_t updates{10};
     double hold{1.0};
-    std::string target_name{default_target_name};
     std::string package_id;
 };
 
@@ -121,8 +120,6 @@ inline SerialOptions parse_serial_options(int argc, char** argv,
         } else if (argument == "--hold" && example == SerialExample::haptics) {
             options.hold = parse_positive_double(
                 require_value(argc, argv, index, argument), argument, true);
-        } else if (argument == "--target-name" && requires_algorithm) {
-            options.target_name = require_value(argc, argv, index, argument);
         } else if (argument == "--package-id" && requires_algorithm) {
             options.package_id = require_value(argc, argv, index, argument);
         } else {
@@ -147,24 +144,9 @@ inline qnbot::SdkConfig serial_config(const std::string& port,
     connection.port = port;
 
     qnbot::GloveConfig glove{side, connection};
-    glove.name = "primary";
 
     qnbot::SdkConfig config;
     config.devices.push_back(glove);
-    return config;
-}
-
-inline qnbot::SdkConfig runtime_config(const SerialOptions& options) {
-    const auto side = *options.side;
-    auto config = serial_config(options.port, side);
-
-    qnbot::TargetConfig target;
-    target.name = options.target_name;
-    target.side = side;
-    target.source =
-        qnbot::DeviceSelector{"glove", std::string("primary"), std::nullopt};
-    target.algorithms = {qnbot::TargetAlgorithm{options.package_id}};
-    config.targets.push_back(std::move(target));
     return config;
 }
 
@@ -178,29 +160,6 @@ inline void print_output(const qnbot::Sample<qnbot::HandJointCommand>& sample) {
         first = false;
     }
     std::cout << "}\n";
-}
-
-inline void print_health(const std::string& label,
-                         const qnbot::Health& health) {
-    std::cout << label << " health ok=" << health.ok
-              << " warnings=" << health.warning_count
-              << " errors=" << health.error_count << " devices=[";
-    bool first = true;
-    for (const auto& entry : health.devices) {
-        if (!first) std::cout << ", ";
-        const auto& source_id = entry.first;
-        const auto& device = entry.second;
-        std::cout << source_id << "(connected=" << device.connected
-                  << ", stale=" << device.stale << ')';
-        first = false;
-    }
-    std::cout << "]\n";
-}
-
-inline void print_health(const qnbot::Health& health) {
-    std::cout << "health ok=" << health.ok
-              << " warnings=" << health.warning_count
-              << " errors=" << health.error_count << '\n';
 }
 
 inline int report_error(const std::exception& error) {

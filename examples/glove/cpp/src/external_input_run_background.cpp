@@ -65,7 +65,7 @@ int main(int argc, char** argv) {
         auto capture_progress = device.capture_progress();
         auto calibration_progress = device.calibration_progress("hand");
         auto capture_control = device.capture_control();
-        std::unordered_set<std::string> confirmed_request_ids;
+        std::unordered_set<std::string> handled_request_ids;
         const auto pose_subscription =
             pose.subscribe([](const qnbot::Sample<qnbot::GlovePose>& sample) {
                 std::cout << "pose callback sequence=" << sample.sequence
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
                           << pushed.meta.sequence.value_or(0) << '\n';
             }
             handle_capture_prompt(capture_progress, capture_control,
-                                  calibration_progress, confirmed_request_ids);
+                                  calibration_progress, handled_request_ids);
             ++step;
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }

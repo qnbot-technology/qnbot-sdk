@@ -44,26 +44,7 @@ def frame(step: int) -> ExternalGloveFrame:
         middle=node(0.03 + offset, 0.04, 0.05),
         ring=node(0.04 + offset, 0.05, 0.06),
         pinky=node(0.05 + offset, 0.06, 0.07),
-        timestamp_sec=step * 0.01,
-    )
-
-
-def create_sdk(package_id: str) -> Sdk:
-    return Sdk(
-        devices=(GloveConfig(side=Side.RIGHT, connection=ExternalConnection()),),
-        targets=(
-            TargetConfig(
-                name="hand",
-                side=Side.RIGHT,
-                source=DeviceSelector(type="glove", side=Side.RIGHT),
-                algorithms=(TargetAlgorithm(id=package_id),),
-            ),
-        ),
-        algorithms=AlgorithmsConfig(
-            capture=CaptureConfig(
-                interaction=CaptureInteractionMode.EXTERNAL,
-            ),
-        ),
+        timestamp_ms=step * 10.0,
     )
 
 
@@ -111,7 +92,28 @@ def main() -> None:
     arguments.add_argument("--package-id", required=True)
     options = arguments.parse_args()
 
-    sdk = create_sdk(options.package_id)
+    sdk = Sdk(
+        devices=(
+            GloveConfig(
+                name="external",
+                side=Side.RIGHT,
+                connection=ExternalConnection(),
+            ),
+        ),
+        targets=(
+            TargetConfig(
+                name="hand",
+                side=Side.RIGHT,
+                source=DeviceSelector(type="glove", side=Side.RIGHT),
+                algorithms=(TargetAlgorithm(id=options.package_id),),
+            ),
+        ),
+        algorithms=AlgorithmsConfig(
+            capture=CaptureConfig(
+                interaction=CaptureInteractionMode.EXTERNAL,
+            ),
+        ),
+    )
     glove = sdk.glove()
     device = glove.device()
     pose = device.pose()
@@ -136,7 +138,6 @@ def main() -> None:
             confirmed_request_ids,
         )
         step += 1
-        # sleep() 等待下一项 SDK 工作；没有剩余工作时短暂让出以保持外部帧节奏。
         if update.sleep() is SleepResult.NO_TASKS:
             time.sleep(0.01)
     latest_pose = pose.latest()

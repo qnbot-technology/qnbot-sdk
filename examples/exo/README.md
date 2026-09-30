@@ -14,8 +14,8 @@
 
 | 语言 | 环境 | 说明 |
 | --- | --- | --- |
-| Python | Python 3.10 或更高版本，已安装 `qnbot-sdk-exo` | [Python 示例](python/README.zh-CN.md) |
-| C++ | CMake 3.16 或更高版本、C++17 编译器、C++ SDK/Exo 交付包 | [C++ 示例](cpp/README.zh-CN.md) |
+| Python | Python 3.10 或更高版本，已安装 `qnbot-sdk-exo` | [Python 示例](python/README.md) |
+| C++ | CMake 3.16 或更高版本、C++17 编译器、C++ SDK/Exo 交付包 | [C++ 示例](cpp/README.md) |
 
 两个工程各自独立：只需要安装你要使用的语言所对应的交付包。
 

@@ -25,29 +25,21 @@ int main(int argc, char** argv) {
     try {
         qnbot::Sdk sdk(
             example::composite_config(example::parse_port(argc, argv)));
-        auto glove_domain = sdk.glove();
-        auto exo_domain = sdk.exo();
-        auto glove = glove_domain.device("glove");
-        auto exo = exo_domain.device("exo");
-        const auto glove_subscription = glove.imu().subscribe(
-            [](const qnbot::Sample<qnbot::GloveImu>& sample) {
-                const auto& value = sample.value.payload;
-                std::cout << "glove imu valid=" << value.valid << " gyro=["
-                          << value.gyroscope_raw[0] << ", "
-                          << value.gyroscope_raw[1] << ", "
-                          << value.gyroscope_raw[2] << "]\n";
-            });
-        const auto exo_subscription = exo.telemetry().subscribe(
+        auto exo = sdk.exo();
+        auto exo_device = exo.device();
+        std::cout << "Glove raw IMU (Telemetry.ImuRawSnapshot, 0x10/0x81) is not "
+                     "exposed on the composite CDC path; reading Exo IMU only\n";
+        const auto exo_subscription = exo_device.telemetry().subscribe(
             [](const qnbot::Sample<qnbot::ExoTelemetry>& sample) {
                 print_exo_imu(sample.value);
             });
 
-        glove_domain.start();
-        exo_domain.start();
-        std::cout << "reading Glove and Exo IMU data; press Ctrl+C to stop\n";
-        // Drive both member domains through the aggregate runner.
+        sdk.start();
+        std::cout << "reading Exo IMU data; press Ctrl+C to stop\n";
+        // The root SDK lifecycle drives both member domains.
         sdk.run_forever();
-        static_cast<void>(glove_subscription);
+        sdk.stop();
+        sdk.close();
         static_cast<void>(exo_subscription);
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

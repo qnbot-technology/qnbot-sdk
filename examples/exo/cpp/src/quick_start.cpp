@@ -13,8 +13,7 @@ int main() {
         qnbot::Sdk sdk(std::move(config));
         auto exo = sdk.exo();
         auto device = exo.device();
-        auto telemetry = device.telemetry();
-        const auto subscription = telemetry.subscribe(
+        const auto subscription = device.telemetry().subscribe(
             [](const qnbot::Sample<qnbot::ExoTelemetry>& sample) {
                 std::cout << "telemetry sequence=" << sample.sequence
                           << " left_arm=";

@@ -15,51 +15,6 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import GloveConfig, GlovePose, HandJointCommand
 
-DEFAULT_TARGET_NAME = "openxr_hand"
-
-
-def create_sdk(
-    port: str,
-    side: Side,
-    sample_rate: int,
-    detail: DebugDetail,
-    target_name: str,
-    package_id: str,
-) -> Sdk:
-    source = DeviceSelector(type="glove", name="primary")
-    modules = (
-        DebugModule.TRANSPORT,
-        DebugModule.DEVICE,
-        DebugModule.CAPTURE,
-        DebugModule.CALIBRATION,
-        DebugModule.RETARGETING,
-        DebugModule.OUTPUT,
-    )
-    debug = DebugConfig(
-        modules=modules,
-        detail=detail,
-        sample_rate=sample_rate,
-    )
-    return Sdk(
-        devices=(
-            GloveConfig(
-                name="primary",
-                side=side,
-                connection=SerialConnection(port=port),
-            ),
-        ),
-        targets=(
-            TargetConfig(
-                name=target_name,
-                side=side,
-                source=source,
-                algorithms=(TargetAlgorithm(id=package_id),),
-            ),
-        ),
-        debug=debug,
-    )
-
-
 def print_pose(origin: str, sample: Sample[GlovePose]) -> None:
     print(f"{origin} pose sequence={sample.sequence}")
 
@@ -88,30 +43,54 @@ def main() -> None:
         choices=tuple(detail.value for detail in DebugDetail),
         default=DebugDetail.SUMMARY.value,
     )
-    arguments.add_argument("--target-name", default=DEFAULT_TARGET_NAME)
     arguments.add_argument("--package-id", required=True)
     options = arguments.parse_args()
     if options.sample_rate <= 0:
         arguments.error("--sample-rate must be greater than 0")
 
-    sdk = create_sdk(
-        options.port,
-        Side(options.side),
-        options.sample_rate,
-        DebugDetail(options.detail),
-        options.target_name,
-        options.package_id,
+    side = Side(options.side)
+    source = DeviceSelector(type="glove", side=side)
+    modules = (
+        DebugModule.TRANSPORT,
+        DebugModule.DEVICE,
+        DebugModule.CAPTURE,
+        DebugModule.CALIBRATION,
+        DebugModule.RETARGETING,
+        DebugModule.OUTPUT,
+    )
+    debug = DebugConfig(
+        modules=modules,
+        detail=DebugDetail(options.detail),
+        sample_rate=options.sample_rate,
+    )
+    sdk = Sdk(
+        devices=(
+            GloveConfig(
+                side=side,
+                connection=SerialConnection(port=options.port),
+            ),
+        ),
+        targets=(
+            TargetConfig(
+                name="openxr_hand",
+                side=side,
+                source=source,
+                algorithms=(TargetAlgorithm(id=options.package_id),),
+            ),
+        ),
+        debug=debug,
     )
     glove = sdk.glove()
     device = glove.device()
-    pose = device.pose()
-    output = device.output(name=options.target_name)
-    pose.subscribe(lambda sample: print_pose("callback", sample))
-    output.subscribe(print_output)
 
-    glove.start()
-    print("ready; press Ctrl+C to stop", flush=True)
-    glove.run_forever()
+    try:
+        device.pose().subscribe(lambda sample: print_pose("callback", sample))
+        device.output(name="openxr_hand").subscribe(print_output)
+        glove.start()
+        print("ready; press Ctrl+C to stop")
+        glove.run_forever()
+    finally:
+        glove.close()
 
 
 if __name__ == "__main__":

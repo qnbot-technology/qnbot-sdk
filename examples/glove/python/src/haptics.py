@@ -12,17 +12,6 @@ from qnbot_sdk import (
 from qnbot_sdk.glove import GloveConfig, GloveFinger, Haptics
 
 
-def create_sdk(port: str, side: Side) -> Sdk:
-    return Sdk(
-        devices=(
-            GloveConfig(
-                side=side,
-                connection=SerialConnection(port=port),
-            ),
-        )
-    )
-
-
 def print_haptics(sample: Sample[Haptics]) -> None:
     print(f"latest haptics sequence={sample.sequence} value={sample.value}")
 
@@ -41,11 +30,19 @@ def main() -> None:
     if options.hold < 0:
         arguments.error("--hold must not be negative")
 
-    sdk = create_sdk(options.port, Side(options.side))
+    sdk = Sdk(
+        devices=(
+            GloveConfig(
+                side=Side(options.side),
+                connection=SerialConnection(port=options.port),
+            ),
+        )
+    )
     glove = sdk.glove()
     glove.start()
 
-    haptics = glove.device().haptics()
+    device = glove.device()
+    haptics = device.haptics()
     haptics.set(
         Haptics(
             {

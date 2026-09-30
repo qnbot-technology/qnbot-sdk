@@ -13,7 +13,12 @@ int main() {
                           << " error=" << device.error->message << '\n';
                 continue;
             }
-            std::cout << "port=" << device.port << " sn=" << *device.sn << '\n';
+            const auto hand = !device.hand
+                                  ? "unknown"
+                                  : *device.hand == qnbot::Side::left ? "left"
+                                                                       : "right";
+            std::cout << "port=" << device.port << " hand=" << hand
+                      << " sn=" << (device.sn ? *device.sn : "None") << '\n';
         }
 
         const auto selected =

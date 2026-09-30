@@ -42,22 +42,20 @@ void print_info(const qnbot::ExoDeviceInfo& info) {
 int main(int argc, char** argv) {
     try {
         std::string port;
-        std::string name = "primary";
         for (int index = 1; index < argc; ++index) {
             const std::string argument = argv[index];
             if (argument == "--port") {
                 port = example::require_value(argc, argv, index, argument);
-            } else if (argument == "--name") {
-                name = example::require_value(argc, argv, index, argument);
             } else {
                 throw std::invalid_argument("unknown argument: " + argument);
             }
         }
         if (port.empty()) throw std::invalid_argument("--port is required");
 
-        qnbot::Sdk sdk(example::serial_config(port, name));
+        qnbot::Sdk sdk(example::serial_config(port));
         auto exo = sdk.exo();
-        print_info(exo.device(name).get_device_info());
+        auto device = exo.device();
+        print_info(device.get_device_info());
         exo.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

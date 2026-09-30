@@ -10,9 +10,9 @@ int main(int argc, char** argv) {
         qnbot::Sdk sdk(example::serial_config(options.port, *options.side));
         auto glove = sdk.glove();
 
-        auto imu = glove.device("primary").imu();
-        const auto subscription =
-            imu.subscribe([](const qnbot::Sample<qnbot::GloveImu>& sample) {
+        auto device = glove.device();
+        const auto subscription = device.imu().subscribe(
+            [](const qnbot::Sample<qnbot::GloveImu>& sample) {
                 const auto& value = sample.value.payload;
                 std::cout << "imu sequence=" << sample.sequence
                           << " valid=" << value.valid << " gyroscope_raw=["
@@ -24,10 +24,16 @@ int main(int argc, char** argv) {
                           << value.accelerometer_raw[2] << "]\n";
             });
 
-        glove.start();
-        std::cout << "running; press Ctrl+C to stop" << std::endl;
-        glove.run_forever();
+        try {
+            glove.start();
+            std::cout << "running; press Ctrl+C to stop" << std::endl;
+            glove.run_forever();
+        } catch (...) {
+            glove.close();
+            throw;
+        }
         static_cast<void>(subscription);
+        glove.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         return example::report_error(error);

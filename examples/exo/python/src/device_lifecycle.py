@@ -7,15 +7,6 @@ from qnbot_sdk import Health, Sdk, SerialConnection
 from qnbot_sdk.exo import ExoConfig
 
 
-def create_sdk(first_port: str, second_port: str) -> Sdk:
-    return Sdk(
-        devices=(
-            ExoConfig(name="first", connection=SerialConnection(port=first_port)),
-            ExoConfig(name="second", connection=SerialConnection(port=second_port)),
-        )
-    )
-
-
 def print_health(label: str, health: Health) -> None:
     print(
         f"{label} health ok={health.ok} warnings={health.warning_count} "
@@ -30,7 +21,18 @@ def main() -> None:
     arguments.add_argument("--seconds", type=float, default=3.0)
     options = arguments.parse_args()
 
-    sdk = create_sdk(options.first_port, options.second_port)
+    sdk = Sdk(
+        devices=(
+            ExoConfig(
+                name="first",
+                connection=SerialConnection(port=options.first_port),
+            ),
+            ExoConfig(
+                name="second",
+                connection=SerialConnection(port=options.second_port),
+            ),
+        )
+    )
     exo = sdk.exo()
     first = exo.device("first")
     second = exo.device("second")
@@ -41,7 +43,7 @@ def main() -> None:
     time.sleep(options.seconds)
 
     second.stop()
-    print("second device stopped; first remains active", flush=True)
+    print("second device stopped; first remains active")
     print_health("first", first.health())
     latest = first.telemetry().latest()
     if latest is not None:

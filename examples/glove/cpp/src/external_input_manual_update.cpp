@@ -83,7 +83,6 @@ int main(int argc, char** argv) {
             handle_capture_prompt(capture_progress, capture_control,
                                   calibration_progress, confirmed_request_ids);
             ++step;
-            // sleep() 等待下一项 SDK 工作；没有剩余工作时短暂让出以保持外部帧节奏。
             if (update.sleep() == qnbot::SleepResult::no_tasks)
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }

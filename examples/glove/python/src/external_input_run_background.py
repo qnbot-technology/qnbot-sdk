@@ -46,26 +46,7 @@ def frame(step: int) -> ExternalGloveFrame:
         middle=node(0.03 + offset, 0.04, 0.05),
         ring=node(0.04 + offset, 0.05, 0.06),
         pinky=node(0.05 + offset, 0.06, 0.07),
-        timestamp_sec=step * 0.01,
-    )
-
-
-def create_sdk(package_id: str) -> Sdk:
-    return Sdk(
-        devices=(GloveConfig(side=Side.RIGHT, connection=ExternalConnection()),),
-        targets=(
-            TargetConfig(
-                name="hand",
-                side=Side.RIGHT,
-                source=DeviceSelector(type="glove", side=Side.RIGHT),
-                algorithms=(TargetAlgorithm(id=package_id),),
-            ),
-        ),
-        algorithms=AlgorithmsConfig(
-            capture=CaptureConfig(
-                interaction=CaptureInteractionMode.EXTERNAL,
-            ),
-        ),
+        timestamp_ms=step * 10.0,
     )
 
 
@@ -80,21 +61,21 @@ def handle_capture_prompt(
         value = capture.value
         if value.session_state is CaptureSessionState.FAILED:
             message = value.failure.message if value.failure else "unknown error"
-            raise RuntimeError(f"capture failed: {message}")
+            raise RuntimeError(f"external input capture failed: {message}")
         stage = value.stage
         if (
             stage.state is CaptureStageState.AWAITING_CONFIRMATION
             and stage.request_id is not None
             and stage.request_id not in handled_request_ids
         ):
-            answer = (
-                input(f"{stage.prompt or 'Continue capture'} [Y/n]: ").strip().lower()
-            )
+            answer = input(
+                f"{stage.prompt or 'Continue capture'} [Y/n]: "
+            ).strip().lower()
             if answer in ("", "y", "yes"):
                 capture_control.confirm(stage.request_id)
             else:
                 capture_control.cancel(stage.request_id)
-                raise RuntimeError("capture was cancelled")
+                raise RuntimeError("external input capture was cancelled")
             handled_request_ids.add(stage.request_id)
     calibration = calibration_progress.latest()
     if (
@@ -103,7 +84,7 @@ def handle_capture_prompt(
     ):
         failure = calibration.value.job.failure
         message = failure.message if failure else "unknown error"
-        raise RuntimeError(f"calibration failed: {message}")
+        raise RuntimeError(f"external input calibration failed: {message}")
 
 
 def main() -> None:
@@ -113,7 +94,26 @@ def main() -> None:
     arguments.add_argument("--package-id", required=True)
     options = arguments.parse_args()
 
-    sdk = create_sdk(options.package_id)
+    sdk = Sdk(
+        devices=(
+            GloveConfig(
+                name="external",
+                side=Side.RIGHT,
+                connection=ExternalConnection(),
+            ),
+        ),
+        targets=(
+            TargetConfig(
+                name="hand",
+                side=Side.RIGHT,
+                source=DeviceSelector(type="glove", side=Side.RIGHT),
+                algorithms=(TargetAlgorithm(id=options.package_id),),
+            ),
+        ),
+        algorithms=AlgorithmsConfig(
+            capture=CaptureConfig(interaction=CaptureInteractionMode.EXTERNAL),
+        ),
+    )
     glove = sdk.glove()
     device = glove.device()
     pose = device.pose()
@@ -121,7 +121,7 @@ def main() -> None:
     capture_progress = device.capture_progress()
     calibration_progress = device.calibration_progress(name="hand")
     control = device.capture_control()
-    confirmed_request_ids: set[str] = set()
+    handled_request_ids: set[str] = set()
 
     def print_pose(sample: Sample[GlovePose]) -> None:
         print(f"pose callback sequence={sample.sequence}")
@@ -132,8 +132,8 @@ def main() -> None:
             f"target={sample.value.target} joints={sample.value.joints}"
         )
 
-    pose_subscription = pose.subscribe(print_pose)
-    output_subscription = output.subscribe(print_output)
+    pose.subscribe(print_pose)
+    output.subscribe(print_output)
     device.start()
     glove.run_background()
 
@@ -147,7 +147,7 @@ def main() -> None:
             capture_progress,
             control,
             calibration_progress,
-            confirmed_request_ids,
+            handled_request_ids,
         )
         step += 1
         time.sleep(0.01)
@@ -162,7 +162,6 @@ def main() -> None:
     glove.request_stop()
     glove.join()
     glove.close()
-    _ = pose_subscription, output_subscription
     print("external background input complete")
 
 

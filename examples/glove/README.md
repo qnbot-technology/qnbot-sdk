@@ -2,6 +2,7 @@
 
 本目录提供手套组件（Glove）的 Python 与 C++ 客户示例，覆盖设备发现、手套姿态、有线
 IMU 原始数据、目标手输出、运行模式、触觉反馈以及采集与标定。
+其中 `time_sync` 示例演示使用外部时间源提供的 Unix 毫秒时间同步 Glove 时间域，并在后台每隔一段时间重新同步。传给 `sync_time` 的 `reference_time_ms` 单位是毫秒，不是纳秒。
 
 ## 准备工作
 
@@ -40,8 +41,8 @@ qnbot algorithm list
 
 | 语言 | 环境 | 说明 |
 | --- | --- | --- |
-| Python | Python 3.10 或更高版本，通过 PyPI 安装 `qnbot-sdk-glove` | [Python 示例](python/README.zh-CN.md) |
-| C++ | CMake 3.16 或更高版本、C++17 编译器、C++ SDK/Glove 交付包 | [C++ 示例](cpp/README.zh-CN.md) |
+| Python | Python 3.10 或更高版本，通过 PyPI 安装 `qnbot-sdk-glove` | [Python 示例](python/README.md) |
+| C++ | CMake 3.16 或更高版本、C++17 编译器、C++ SDK/Glove 交付包 | [C++ 示例](cpp/README.md) |
 
 两个工程各自独立：只需要安装你要使用的语言所对应的交付包。
 

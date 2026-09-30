@@ -73,6 +73,7 @@ cmake --build build --config Release
 | `external_input_manual_update` | C++17 | 否 | 是 | 由应用提供手套帧，并由应用手动更新 |
 | `skeleton` | C++17 | 是 | 否 | 读取手部骨骼数据 |
 | `quick_start` | C++17 | 是 | 否 | 零参数读取单只手套姿态 |
+| `time_sync` | C++17 | 是 | 否 | 在后台运行并定期使用外部时间源提供的 Unix 毫秒时间同步 Glove 时钟后读取姿态 |
 | `imu` | C++17 | 是 | 否 | 读取有线 IMU 原始计数 |
 | `manual_runtime` | C++17 | 是 | 是 | 由应用控制每次更新 |
 | `foreground_runtime` | C++17 | 是 | 是 | 在当前线程持续运行 |
@@ -84,12 +85,9 @@ cmake --build build --config Release
 | `haptics` | C++17 | 是 | 否 | 设置并清除触觉反馈 |
 | `host_capture_calibration` | C++17 | 是，两只 | 是 | 完成左右手采集并保存、应用标定结果 |
 
-两个 external input 示例都需要显式提供算法包：后台示例适合普通应用，手动更新示例适合
-由应用控制每次更新的循环。使用算法包的示例必须显式传入 `--package-id`，两个 external
-input 示例也不例外。
+两个 external input 示例都需要显式提供算法包，并由应用确认外部采集阶段：后台示例让 SDK 在后台处理运行任务，手动更新示例适合由应用控制每次更新的循环。使用算法包的示例必须显式传入 `--package-id`，两个 external input 示例也不例外。
 
-手动更新示例在每次 `update()` 后调用 update result 的 `sleep()` 等待下一项 SDK 工作；
-自动连接恢复由 SDK 自行推进，不需要运行方式或额外的 `update()` 调用。
+手动更新示例会等待每次更新完成，再读取当前输出。
 
 ## 常用命令
 
@@ -106,6 +104,7 @@ input 示例也不例外。
 ./build/discover_gloves
 ./build/skeleton --port /dev/ttyUSB0 --side left
 ./build/quick_start
+./build/time_sync
 ./build/imu --port /dev/ttyUSB0 --side left
 ./build/manual_runtime --port /dev/ttyUSB0 --side left --package-id <package-id> --updates 100
 ./build/foreground_runtime --port /dev/ttyUSB0 --side left --package-id <package-id>
@@ -117,6 +116,9 @@ input 示例也不例外。
 ./build/haptics --port /dev/ttyUSB0 --side left --hold 1
 ./build/host_capture_calibration --package-id <package-id>
 ```
+
+`time_sync` 使用后台运行模式，每隔 1 秒重新获取一次外部时间源的 Unix 毫秒时间戳并调用
+`glove.sync_time(reference_time_ms)`。传入参数的单位是毫秒，不是纳秒；按 `Ctrl+C` 停止。
 
 `host_capture_calibration` 可同时接收多个包，完成左右手采集后选择一个已配置 target，保存并
 应用标定结果：
@@ -143,13 +145,10 @@ input 示例也不例外。
 - `--port`：手套串口；使用 `--port` 的参数化示例必须显式提供串口。
 - `--side`：手套物理侧，取值为 `left` 或 `right`。
 - `--package-id`：已经安装的目标手算法包 ID；该参数不会安装算法包。
-- `--target-name`：应用为输出指定的名称。
 - `--force`：`host_capture_calibration` 忽略可复用采集并重新采集。
 - `--detail`、`--sample-rate`：控制 `debug_trace` 的诊断日志详细程度和采样率。
 
-`debug_trace` 生成的诊断日志固定写入 `<QNBOT_HOME>/logs`。按 `Ctrl+C` 后，示例会
-先停止运行并关闭 SDK；关闭成功后，本次会话包含最终汇总。直接终止进程则可能留下不完整
-日志。
+`debug_trace` 生成的诊断日志固定写入 `<QNBOT_HOME>/logs`。
 
 缺少标定时按终端提示操作，完成后示例会开始输出目标关节结果。
 

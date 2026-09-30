@@ -4,32 +4,19 @@ import argparse
 
 from qnbot_sdk import (
     CompositeExoGloveConfig,
-    DeviceStatus,
     Sample,
     Sdk,
     SerialConnection,
+    Side,
 )
-from qnbot_sdk.exo import ExoConfig, ExoTelemetry
-from qnbot_sdk.glove import GloveConfig, GlovePose
-
-EXO_NAME = "exo"
-GLOVE_NAME = "glove"
+from qnbot_sdk.exo import ExoConfig, ExoStatus, ExoTelemetry
+from qnbot_sdk.glove import GloveConfig, GlovePose, GloveStatus
 
 
-def create_sdk(port: str) -> Sdk:
-    return Sdk(
-        devices=(
-            CompositeExoGloveConfig(
-                connection=SerialConnection(port=port),
-                devices=(GloveConfig(name=GLOVE_NAME), ExoConfig(name=EXO_NAME)),
-            ),
-        )
-    )
-
-
-def print_glove(sample: Sample[GlovePose]) -> None:
+def print_glove(label: str, sample: Sample[GlovePose]) -> None:
     print(
-        f"glove pose sequence={sample.sequence} hand={sample.value.payload.hand_side}"
+        f"{label} glove pose sequence={sample.sequence} "
+        f"hand={sample.value.payload.hand_side}"
     )
 
 
@@ -37,12 +24,12 @@ def print_exo(sample: Sample[ExoTelemetry]) -> None:
     print(f"exo telemetry sequence={sample.sequence} quality={sample.value.quality}")
 
 
-def print_status(sample: Sample[DeviceStatus]) -> None:
+def print_status(sample: Sample[ExoStatus]) -> None:
     print(f"exo status sequence={sample.sequence} value={sample.value}")
 
 
-def print_glove_status(sample: Sample[DeviceStatus]) -> None:
-    print(f"glove status sequence={sample.sequence} value={sample.value}")
+def print_glove_status(label: str, sample: Sample[GloveStatus]) -> None:
+    print(f"{label} glove status sequence={sample.sequence} value={sample.value}")
 
 
 def main() -> None:
@@ -52,27 +39,42 @@ def main() -> None:
     arguments.add_argument("--port", required=True, help="Shared serial port")
     options = arguments.parse_args()
 
-    sdk = create_sdk(port=options.port)
+    sdk = Sdk(
+        devices=(
+            CompositeExoGloveConfig(
+                connection=SerialConnection(port=options.port),
+                devices=(
+                    GloveConfig(side=Side.LEFT),
+                    GloveConfig(side=Side.RIGHT),
+                    ExoConfig(),
+                ),
+            ),
+        )
+    )
     try:
-        glove_domain = sdk.glove()
-        exo_domain = sdk.exo()
-        glove = glove_domain.device(GLOVE_NAME)
-        exo = exo_domain.device(EXO_NAME)
-        glove.pose().subscribe(print_glove)
-        glove.status().subscribe(print_glove_status)
-        exo.telemetry().subscribe(print_exo)
-        exo.status().subscribe(print_status)
-        glove_domain.start()
-        exo_domain.start()
-        print("running; press Ctrl+C to stop", flush=True)
-        # The aggregate runner is required to drive both member domains.
+        glove = sdk.glove()
+        exo = sdk.exo()
+        left_glove_device = glove.device(side=Side.LEFT)
+        right_glove_device = glove.device(side=Side.RIGHT)
+        exo_device = exo.device()
+        left_glove_device.pose().subscribe(lambda sample: print_glove("left", sample))
+        right_glove_device.pose().subscribe(lambda sample: print_glove("right", sample))
+        left_glove_device.status().subscribe(
+            lambda sample: print_glove_status("left", sample)
+        )
+        right_glove_device.status().subscribe(
+            lambda sample: print_glove_status("right", sample)
+        )
+        exo_device.telemetry().subscribe(print_exo)
+        exo_device.status().subscribe(print_status)
+        sdk.start()
+        print("running; press Ctrl+C to stop")
+        # The root SDK lifecycle drives both member domains.
         sdk.run_forever()
     except KeyboardInterrupt:
-        glove_domain.stop()
-        exo_domain.stop()
+        sdk.stop()
     finally:
-        glove_domain.close()
-        exo_domain.close()
+        sdk.close()
 
 
 if __name__ == "__main__":

@@ -18,11 +18,14 @@ inline qnbot::GloveNodePose node(double x, double y, double z) {
 
 inline qnbot::ExternalGloveFrame frame(std::uint64_t step) {
     const double offset = static_cast<double>(step) * 0.001;
-    return {
-        node(0.01 + offset, 0.02, 0.03), node(0.02 + offset, 0.03, 0.04),
-        node(0.03 + offset, 0.04, 0.05), node(0.04 + offset, 0.05, 0.06),
-        node(0.05 + offset, 0.06, 0.07), static_cast<double>(step) * 0.01,
-    };
+    qnbot::ExternalGloveFrame result;
+    result.thumb = node(0.01 + offset, 0.02, 0.03);
+    result.index = node(0.02 + offset, 0.03, 0.04);
+    result.middle = node(0.03 + offset, 0.04, 0.05);
+    result.ring = node(0.04 + offset, 0.05, 0.06);
+    result.pinky = node(0.05 + offset, 0.06, 0.07);
+    result.timestamp_ms = static_cast<double>(step) * 0.01;
+    return result;
 }
 
 inline std::string parse_package_id(int argc, char** argv) {
@@ -43,12 +46,13 @@ inline std::string parse_package_id(int argc, char** argv) {
 }
 
 inline qnbot::SdkConfig make_config(const std::string& package_id) {
-    qnbot::GloveConfig glove{qnbot::Side::right, qnbot::ExternalConnection{}};
-    glove.name = "external";
+    qnbot::GloveConfig glove{
+        std::string{"external"}, qnbot::Side::right,
+        qnbot::ExternalConnection{}, true};
 
     qnbot::TargetConfig target;
     target.source =
-        qnbot::DeviceSelector{"glove", std::string("external"), std::nullopt};
+        qnbot::DeviceSelector{"glove", std::nullopt, qnbot::Side::right};
     target.name = "hand";
     target.side = qnbot::Side::right;
     target.algorithms = {qnbot::TargetAlgorithm{package_id}};

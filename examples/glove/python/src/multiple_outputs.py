@@ -15,37 +15,6 @@ from qnbot_sdk import (
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
 
 
-def create_sdk(
-    port: str,
-    side: Side,
-    package_id: str,
-) -> Sdk:
-    source = DeviceSelector(type="glove", name="primary")
-    return Sdk(
-        devices=(
-            GloveConfig(
-                name="primary",
-                side=side,
-                connection=SerialConnection(port=port),
-            ),
-        ),
-        targets=(
-            TargetConfig(
-                name="primary",
-                side=side,
-                source=source,
-                algorithms=(TargetAlgorithm(id=package_id),),
-            ),
-            TargetConfig(
-                name="backup",
-                side=side,
-                source=source,
-                algorithms=(TargetAlgorithm(id=package_id),),
-            ),
-        ),
-    )
-
-
 def print_output(name: str) -> Callable[[Sample[HandJointCommand]], None]:
     def show(sample: Sample[HandJointCommand]) -> None:
         print(
@@ -74,21 +43,41 @@ def main() -> None:
     )
     options = arguments.parse_args()
 
-    sdk = create_sdk(
-        options.port,
-        Side(options.side),
-        options.package_id,
+    side = Side(options.side)
+    source = DeviceSelector(type="glove", side=side)
+    sdk = Sdk(
+        devices=(
+            GloveConfig(
+                side=side,
+                connection=SerialConnection(port=options.port),
+            ),
+        ),
+        targets=(
+            TargetConfig(
+                name="primary",
+                side=side,
+                source=source,
+                algorithms=(TargetAlgorithm(id=options.package_id),),
+            ),
+            TargetConfig(
+                name="backup",
+                side=side,
+                source=source,
+                algorithms=(TargetAlgorithm(id=options.package_id),),
+            ),
+        ),
     )
     glove = sdk.glove()
     device = glove.device()
-    primary = device.output(name="primary")
-    backup = device.output(name="backup")
-    primary.subscribe(print_output("primary"))
-    backup.subscribe(print_output("backup"))
 
-    glove.start()
-    print("running; press Ctrl+C to stop", flush=True)
-    glove.run_forever()
+    try:
+        device.output(name="primary").subscribe(print_output("primary"))
+        device.output(name="backup").subscribe(print_output("backup"))
+        glove.start()
+        print("running; press Ctrl+C to stop")
+        glove.run_forever()
+    finally:
+        glove.close()
 
 
 if __name__ == "__main__":

@@ -10,7 +10,6 @@
 int main(int argc, char** argv) {
     try {
         std::string port;
-        std::string name = "primary";
         std::uint8_t left = 60;
         std::uint8_t right = 60;
         double hold = 1.0;
@@ -18,8 +17,6 @@ int main(int argc, char** argv) {
             const std::string argument = argv[index];
             if (argument == "--port") {
                 port = example::require_value(argc, argv, index, argument);
-            } else if (argument == "--name") {
-                name = example::require_value(argc, argv, index, argument);
             } else if (argument == "--left") {
                 left = example::parse_strength(
                     example::require_value(argc, argv, index, argument),
@@ -37,9 +34,9 @@ int main(int argc, char** argv) {
         }
         if (port.empty()) throw std::invalid_argument("--port is required");
 
-        qnbot::Sdk sdk(example::serial_config(port, name));
+        qnbot::Sdk sdk(example::serial_config(port));
         auto exo = sdk.exo();
-        auto device = exo.device(name);
+        auto device = exo.device();
         if (!device.get_device_info().capabilities.haptics) {
             std::cout << "this device reports no haptics" << std::endl;
             exo.close();
