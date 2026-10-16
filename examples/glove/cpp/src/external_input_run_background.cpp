@@ -10,11 +10,10 @@
 
 namespace {
 
-void handle_capture_prompt(
+void check_preparation(
     const qnbot::ReadChannel<qnbot::CaptureProgress>& capture_progress,
-    const qnbot::CaptureControl& capture_control,
-    const qnbot::ReadChannel<qnbot::CalibrationProgress>& calibration_progress,
-    std::unordered_set<std::string>& handled_request_ids) {
+    const qnbot::ReadChannel<qnbot::CalibrationProgress>&
+        calibration_progress) {
     if (const auto capture = capture_progress.latest()) {
         if (capture->value.session_state ==
             qnbot::CaptureSessionState::failed) {
@@ -23,11 +22,31 @@ void handle_capture_prompt(
                                      : "unknown error";
             throw std::runtime_error("capture failed: " + message);
         }
+        if (capture->value.session_state ==
+            qnbot::CaptureSessionState::cancelled)
+            throw std::runtime_error("capture was cancelled");
+    }
+    if (const auto calibration = calibration_progress.latest();
+        calibration &&
+        calibration->value.job.state == qnbot::CalibrationJobState::failed) {
+        const auto message = calibration->value.job.failure
+                                 ? calibration->value.job.failure->message
+                                 : "unknown error";
+        throw std::runtime_error("calibration failed: " + message);
+    }
+}
+
+void handle_capture_prompt(
+    const qnbot::ReadChannel<qnbot::CaptureProgress>& capture_progress,
+    const qnbot::CaptureControl& capture_control,
+    std::unordered_set<std::string>& handled_request_ids) {
+    if (const auto capture = capture_progress.latest()) {
         const auto& stage = capture->value.stage;
         if (stage.state == qnbot::CaptureStageState::awaiting_confirmation &&
             stage.request_id &&
             handled_request_ids.count(*stage.request_id) == 0) {
-            std::cout << stage.prompt << " [Y/n]: ";
+            std::cout << (stage.prompt_en ? *stage.prompt_en : stage.prompt)
+                      << " [Y/n]: ";
             std::string answer;
             std::getline(std::cin, answer);
             if (answer.empty() || answer == "y" || answer == "Y" ||
@@ -40,23 +59,14 @@ void handle_capture_prompt(
             handled_request_ids.insert(*stage.request_id);
         }
     }
-    if (const auto calibration = calibration_progress.latest();
-        calibration &&
-        calibration->value.job.state == qnbot::CalibrationJobState::failed) {
-        const auto message = calibration->value.job.failure
-                                 ? calibration->value.job.failure->message
-                                 : "unknown error";
-        throw std::runtime_error("calibration failed: " + message);
-    }
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
     try {
-        const auto package_id =
-            external_input_example::parse_package_id(argc, argv);
-        qnbot::Sdk sdk(external_input_example::make_config(package_id));
+        const auto options = external_input_example::parse_options(argc, argv);
+        qnbot::Sdk sdk(external_input_example::make_config(options));
         auto glove = sdk.glove();
 
         auto device = glove.device("external");
@@ -66,11 +76,6 @@ int main(int argc, char** argv) {
         auto calibration_progress = device.calibration_progress("hand");
         auto capture_control = device.capture_control();
         std::unordered_set<std::string> handled_request_ids;
-        const auto pose_subscription =
-            pose.subscribe([](const qnbot::Sample<qnbot::GlovePose>& sample) {
-                std::cout << "pose callback sequence=" << sample.sequence
-                          << '\n';
-            });
         const auto output_subscription = output.subscribe(
             [](const qnbot::Sample<qnbot::HandJointCommand>& sample) {
                 example::print_output(sample);
@@ -83,14 +88,13 @@ int main(int argc, char** argv) {
         std::uint64_t step = 1;
         while (!output.latest() &&
                std::chrono::steady_clock::now() < deadline) {
-            const auto pushed =
-                device.push_frame(external_input_example::frame(step));
-            if (step == 1) {
-                std::cout << "pushed pose sequence="
-                          << pushed.meta.sequence.value_or(0) << '\n';
+            check_preparation(capture_progress, calibration_progress);
+            device.push_frame(external_input_example::frame(step));
+            if (options.interaction ==
+                qnbot::CaptureInteractionMode::external) {
+                handle_capture_prompt(capture_progress, capture_control,
+                                      handled_request_ids);
             }
-            handle_capture_prompt(capture_progress, capture_control,
-                                  calibration_progress, handled_request_ids);
             ++step;
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
@@ -101,14 +105,12 @@ int main(int argc, char** argv) {
             throw std::runtime_error(
                 "external input did not publish retargeting output");
         }
-        std::cout << "latest pose sequence=" << latest_pose->sequence
-                  << " latest retargeting output sequence="
+        std::cout << "latest retargeting output sequence="
                   << latest_output->sequence << '\n';
 
         glove.request_stop();
         glove.join();
         glove.close();
-        static_cast<void>(pose_subscription);
         static_cast<void>(output_subscription);
         std::cout << "external background input complete\n";
         return EXIT_SUCCESS;

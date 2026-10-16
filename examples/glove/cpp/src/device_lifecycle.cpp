@@ -109,7 +109,8 @@ void handle_capture_prompt(
         if (stage.state == qnbot::CaptureStageState::awaiting_confirmation &&
             stage.request_id &&
             handled_request_ids.count(*stage.request_id) == 0) {
-            std::cout << stage.prompt << " [Y/n]: ";
+            std::cout << (stage.prompt_en ? *stage.prompt_en : stage.prompt)
+                      << " [Y/n]: ";
             std::string answer;
             std::getline(std::cin, answer);
             if (answer.empty() || answer == "y" || answer == "Y" ||
@@ -155,25 +156,27 @@ int main(int argc, char** argv) {
         left.start();
         right.start();
 
-        const auto wait_for_output =
-            [&](const auto& output, const auto& capture_progress,
-                const auto& capture_control, const auto& calibration_progress) {
-                std::unordered_set<std::string> handled_request_ids;
-                const auto deadline = std::chrono::steady_clock::now() +
-                                      std::chrono::seconds(300);
-                while (!output.latest() &&
-                       std::chrono::steady_clock::now() < deadline) {
-                    const auto update = glove.update();
-                    handle_capture_prompt(capture_progress, capture_control,
-                                          calibration_progress,
-                                          handled_request_ids);
-                    static_cast<void>(update.sleep());
-                }
-                if (!output.latest()) {
-                    throw std::runtime_error(
-                        "retargeting output was not ready before the timeout");
-                }
-            };
+        const auto wait_for_output = [&](const auto& output,
+                                         const auto& capture_progress,
+                                         const auto& capture_control,
+                                         const auto& calibration_progress) {
+            std::unordered_set<std::string> handled_request_ids;
+            const auto deadline =
+                std::chrono::steady_clock::now() + std::chrono::seconds(300);
+            while (!output.latest() &&
+                   std::chrono::steady_clock::now() < deadline) {
+                const auto update = glove.update();
+                handle_capture_prompt(capture_progress, capture_control,
+                                      calibration_progress,
+                                      handled_request_ids);
+                if (update.sleep() == qnbot::SleepResult::no_tasks)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            if (!output.latest()) {
+                throw std::runtime_error(
+                    "retargeting output was not ready before the timeout");
+            }
+        };
         wait_for_output(left_output, left_capture_progress,
                         left_capture_control, left_calibration_progress);
         wait_for_output(right_output, right_capture_progress,
@@ -181,7 +184,8 @@ int main(int argc, char** argv) {
 
         for (std::uint64_t index = 0; index < options.updates; ++index) {
             const auto update = glove.update();
-            static_cast<void>(update.sleep());
+            if (update.sleep() == qnbot::SleepResult::no_tasks)
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             if (const auto sample = left_output.latest()) {
                 print_output("left", *sample);
             }
@@ -205,7 +209,8 @@ int main(int argc, char** argv) {
         std::optional<qnbot::Sample<qnbot::HandJointCommand>> left_sample;
         for (std::uint64_t index = 0; index < options.updates; ++index) {
             const auto update = glove.update();
-            static_cast<void>(update.sleep());
+            if (update.sleep() == qnbot::SleepResult::no_tasks)
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             const auto right_candidate = right_output.latest();
             if (right_candidate &&
                 right_candidate->sequence > right_stopped_baseline->sequence) {
@@ -235,7 +240,8 @@ int main(int argc, char** argv) {
         std::optional<qnbot::Sample<qnbot::HandJointCommand>> right_sample;
         for (std::uint64_t index = 0; index < options.updates; ++index) {
             const auto update = glove.update();
-            static_cast<void>(update.sleep());
+            if (update.sleep() == qnbot::SleepResult::no_tasks)
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             const auto candidate = right_output.latest();
             if (candidate &&
                 candidate->sequence > right_before_restart->sequence) {

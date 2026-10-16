@@ -38,19 +38,6 @@ int main(int argc, char** argv) {
                               << " joints=" << sample.value.joints.size()
                               << '\n';
                 });
-        const auto pose_subscription = skeleton.pose().subscribe(
-            [](const qnbot::Sample<qnbot::HandSkeletonPose>& sample) {
-                const auto& pose = sample.value;
-                std::cout << "pose sequence=" << sample.sequence
-                          << " frame=" << pose.coordinate_frame << " wrist=["
-                          << pose.positions_local[0][0] << ", "
-                          << pose.positions_local[0][1] << ", "
-                          << pose.positions_local[0][2] << "] index_tip=["
-                          << pose.positions_local[9][0] << ", "
-                          << pose.positions_local[9][1] << ", "
-                          << pose.positions_local[9][2] << "]\n";
-            });
-
         try {
             glove.start();
             std::cout << "running; press Ctrl+C to stop" << std::endl;
@@ -60,7 +47,6 @@ int main(int argc, char** argv) {
             throw;
         }
         static_cast<void>(joint_angles_subscription);
-        static_cast<void>(pose_subscription);
         glove.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

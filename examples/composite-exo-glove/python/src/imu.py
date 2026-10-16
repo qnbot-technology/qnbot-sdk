@@ -19,7 +19,9 @@ def print_exo_imu(sample: Sample[ExoTelemetry]) -> None:
 
 
 def main() -> None:
-    arguments = argparse.ArgumentParser(description="Read Exo IMU data on a composite link")
+    arguments = argparse.ArgumentParser(
+        description="Read Exo IMU data on a composite link"
+    )
     arguments.add_argument("--port", required=True, help="Shared serial port")
     options = arguments.parse_args()
 

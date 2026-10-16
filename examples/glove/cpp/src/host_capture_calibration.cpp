@@ -6,6 +6,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -126,13 +127,14 @@ std::string select_target(const std::vector<std::string>& package_ids) {
 
 void update_or_wait(qnbot::Glove& glove) {
     const auto update = glove.update();
-    static_cast<void>(update.sleep());
+    if (update.sleep() == qnbot::SleepResult::no_tasks)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
 qnbot::CaptureSession capture_side(qnbot::GloveDevice& device,
                                    qnbot::Glove& glove,
                                    const std::vector<std::string>& package_ids,
-                                   bool force, bool start_runtime) {
+                                   bool force) {
     const auto readiness = device.capture_status(package_ids, operator_id);
     std::cout << device.source_id()
               << ": capture readiness=" << static_cast<int>(readiness.state)
@@ -141,7 +143,6 @@ qnbot::CaptureSession capture_side(qnbot::GloveDevice& device,
         std::cout << "  " << stage.stage_id << '\n';
 
     auto session = device.start_capture(package_ids, operator_id, force);
-    if (start_runtime) glove.start();
     const auto deadline = std::chrono::steady_clock::now() + wait_timeout;
     while (std::chrono::steady_clock::now() < deadline) {
         const auto snapshot = session.snapshot();
@@ -177,10 +178,11 @@ qnbot::CaptureSession capture_side(qnbot::GloveDevice& device,
                     return snapshot.current_stage &&
                            stage.stage_id == *snapshot.current_stage;
                 });
-            std::cout << (plan_stage == snapshot.plan.stages.end()
-                              ? "Continue capture"
-                              : plan_stage->prompt)
-                      << " [Y/n]: ";
+            std::string prompt = "Continue capture";
+            if (plan_stage != snapshot.plan.stages.end()) {
+                prompt = plan_stage->prompt_en.value_or(plan_stage->prompt);
+            }
+            std::cout << prompt << " [Y/n]: ";
             std::string answer;
             std::getline(std::cin, answer);
             if (answer.empty() || answer == "confirm" || answer == "y" ||
@@ -256,10 +258,14 @@ int main(int argc, char** argv) {
             static_cast<void>(right_device.skeleton());
         }
 
-        auto left_session = capture_side(
-            left_device, glove, options.package_ids, options.force, true);
-        auto right_session = capture_side(
-            right_device, glove, options.package_ids, options.force, false);
+        glove.start();
+        left_device.start(qnbot::CalibrationMode::manual);
+        right_device.start(qnbot::CalibrationMode::manual);
+
+        auto left_session = capture_side(left_device, glove,
+                                         options.package_ids, options.force);
+        auto right_session = capture_side(right_device, glove,
+                                          options.package_ids, options.force);
         const std::vector<std::optional<std::string>> targets{
             select_target(left_session.snapshot().plan.package_ids)};
         calibrate(left_device, glove, left_session, targets);

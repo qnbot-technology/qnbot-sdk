@@ -7,11 +7,13 @@ from qnbot_sdk import (
     DeviceSelector,
     Sdk,
     Side,
+    SleepResult,
     TargetAlgorithm,
     TargetConfig,
 )
 from qnbot_sdk.glove import (
     CalibrationJobState,
+    CalibrationMode,
     CalibrationSessionState,
     CaptureSession,
     CaptureSessionState,
@@ -64,7 +66,6 @@ def capture_side(
     glove: Glove,
     package_ids: tuple[str, ...],
     force: bool,
-    start_runtime: bool,
 ) -> CaptureSession:
     readiness = device.capture_status(
         package_ids=package_ids,
@@ -79,8 +80,6 @@ def capture_side(
         operator_id=OPERATOR_ID,
         force=force,
     )
-    if start_runtime:
-        glove.start()
     deadline = time.monotonic() + WAIT_SECONDS
     while time.monotonic() < deadline:
         snapshot = session.snapshot()
@@ -114,13 +113,17 @@ def capture_side(
             if snapshot.request_id is None:
                 session.cancel()
                 raise RuntimeError("capture confirmation is missing its request token")
-            prompt = next(
-                (
-                    stage.prompt
-                    for stage in snapshot.plan.stages
-                    if stage.stage_id == snapshot.current_stage
-                ),
-                snapshot.current_stage or "Continue capture",
+            prompt = (
+                next(
+                    (
+                        stage.prompt_en or stage.prompt
+                        for stage in snapshot.plan.stages
+                        if stage.stage_id == snapshot.current_stage
+                    ),
+                    None,
+                )
+                or snapshot.current_stage
+                or "Continue capture"
             )
             answer = input(f"{device.source_id} {prompt} [Y/n]: ").strip().lower()
             if answer in ("", "confirm", "y", "yes"):
@@ -131,7 +134,8 @@ def capture_side(
             continue
 
         update = glove.update()
-        update.sleep()
+        if update.sleep() is SleepResult.NO_TASKS:
+            time.sleep(0.01)
 
     session.cancel()
     raise TimeoutError(f"{device.source_id} capture timed out")
@@ -174,7 +178,8 @@ def calibrate(
             calibration.close()
             raise RuntimeError("calibration cancelled")
         update = glove.update()
-        update.sleep()
+        if update.sleep() is SleepResult.NO_TASKS:
+            time.sleep(0.01)
 
     calibration.close()
     raise TimeoutError("calibration timed out")
@@ -223,12 +228,12 @@ def main() -> None:
         left_device.skeleton()
         right_device.skeleton()
 
-    left_session = capture_side(
-        left_device, glove, package_ids, options.force, start_runtime=True
-    )
-    right_session = capture_side(
-        right_device, glove, package_ids, options.force, start_runtime=False
-    )
+    glove.start()
+    left_device.start(CalibrationMode.MANUAL)
+    right_device.start(CalibrationMode.MANUAL)
+
+    left_session = capture_side(left_device, glove, package_ids, options.force)
+    right_session = capture_side(right_device, glove, package_ids, options.force)
     targets = (select_target(left_session.snapshot().plan.package_ids),)
     calibrate(left_device, glove, left_session, targets)
     calibrate(right_device, glove, right_session, targets)

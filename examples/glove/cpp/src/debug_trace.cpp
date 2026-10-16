@@ -80,10 +80,6 @@ int main(int argc, char** argv) {
         auto glove = sdk.glove();
 
         auto device = glove.device();
-        const auto pose_subscription = device.pose().subscribe(
-            [](const qnbot::Sample<qnbot::GlovePose>& sample) {
-                std::cout << "pose sequence=" << sample.sequence << '\n';
-            });
         const auto output_subscription =
             device.output(example::default_target_name)
                 .subscribe(example::print_output);
@@ -96,7 +92,6 @@ int main(int argc, char** argv) {
             glove.close();
             throw;
         }
-        static_cast<void>(pose_subscription);
         static_cast<void>(output_subscription);
         glove.close();
         return EXIT_SUCCESS;

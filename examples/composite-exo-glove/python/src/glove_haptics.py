@@ -9,7 +9,9 @@ from qnbot_sdk.glove import GloveConfig, GloveFinger, GloveHaptics
 
 
 def main() -> None:
-    arguments = argparse.ArgumentParser(description="Control Glove haptics in a composite")
+    arguments = argparse.ArgumentParser(
+        description="Control Glove haptics in a composite"
+    )
     arguments.add_argument("--port", required=True, help="Shared serial port")
     arguments.add_argument("--hold", type=float, default=1.0)
     options = arguments.parse_args()

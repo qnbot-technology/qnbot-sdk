@@ -1,7 +1,9 @@
 #include "example_support.hpp"
 
+#include <chrono>
 #include <cstdlib>
 #include <iostream>
+#include <thread>
 
 int main(int argc, char** argv) {
     try {
@@ -28,7 +30,8 @@ int main(int argc, char** argv) {
             const auto update = glove.update();
             std::cout << "tick=" << update.tick()
                       << " tasks=" << update.ran_task_count() << '\n';
-            static_cast<void>(update.sleep());
+            if (update.sleep() == qnbot::SleepResult::no_tasks)
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             if (const auto latest = output.latest()) {
                 example::print_output(*latest);
             }

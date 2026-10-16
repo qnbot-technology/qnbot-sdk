@@ -13,10 +13,10 @@ int main() {
                           << " error=" << device.error->message << '\n';
                 continue;
             }
-            const auto hand = !device.hand
-                                  ? "unknown"
-                                  : *device.hand == qnbot::Side::left ? "left"
-                                                                       : "right";
+            const char* hand = "unknown";
+            if (device.hand) {
+                hand = *device.hand == qnbot::Side::left ? "left" : "right";
+            }
             std::cout << "port=" << device.port << " hand=" << hand
                       << " sn=" << (device.sn ? *device.sn : "None") << '\n';
         }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+
 from qnbot_sdk import (
     DebugConfig,
     DebugDetail,
@@ -13,10 +14,7 @@ from qnbot_sdk import (
     TargetAlgorithm,
     TargetConfig,
 )
-from qnbot_sdk.glove import GloveConfig, GlovePose, HandJointCommand
-
-def print_pose(origin: str, sample: Sample[GlovePose]) -> None:
-    print(f"{origin} pose sequence={sample.sequence}")
+from qnbot_sdk.glove import GloveConfig, HandJointCommand
 
 
 def print_output(sample: Sample[HandJointCommand]) -> None:
@@ -28,7 +26,7 @@ def print_output(sample: Sample[HandJointCommand]) -> None:
 
 def main() -> None:
     arguments = argparse.ArgumentParser(
-        description="Read glove poses with sampled debug tracing enabled"
+        description="Read retargeting output with sampled debug tracing enabled"
     )
     arguments.add_argument("--port", required=True, help="Serial port for the glove")
     arguments.add_argument(
@@ -84,7 +82,6 @@ def main() -> None:
     device = glove.device()
 
     try:
-        device.pose().subscribe(lambda sample: print_pose("callback", sample))
         device.output(name="openxr_hand").subscribe(print_output)
         glove.start()
         print("ready; press Ctrl+C to stop")
