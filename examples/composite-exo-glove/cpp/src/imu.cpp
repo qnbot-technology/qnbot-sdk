@@ -27,8 +27,9 @@ int main(int argc, char** argv) {
             example::composite_config(example::parse_port(argc, argv)));
         auto exo = sdk.exo();
         auto exo_device = exo.device();
-        std::cout << "Glove raw IMU (Telemetry.ImuRawSnapshot, 0x10/0x81) is not "
-                     "exposed on the composite CDC path; reading Exo IMU only\n";
+        std::cout
+            << "Glove raw IMU (Telemetry.ImuRawSnapshot, 0x10/0x81) is not "
+               "exposed on the composite CDC path; reading Exo IMU only\n";
         const auto exo_subscription = exo_device.telemetry().subscribe(
             [](const qnbot::Sample<qnbot::ExoTelemetry>& sample) {
                 print_exo_imu(sample.value);

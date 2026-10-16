@@ -28,6 +28,8 @@ sdk.close();
 - CMake 3.16 或更高版本；
 - 支持 C++17 的编译器；
 - 同一版本的 QnBot C++ Exo 和 Glove 交付包。
+- 运行 `glove_retargeting` 还需要按 [Glove 示例说明](../../glove/cpp/README.md) 安装与当前 SDK
+  和平台匹配的目标手算法包。
 
 从 [GitHub Releases](https://github.com/qnbot-technology/qnbot-sdk/releases) 下载当前平台的
 SDK 交付包，并确保 CMake 能找到 `qnbot_exo` 和 `qnbot_glove`。
@@ -53,6 +55,7 @@ cmake --build build --config Release
 | `quick_start` | 是 | 使用默认自动发现，同时订阅左右 Glove pose 和 Exo telemetry |
 | `device_info` | 是 | 展示左右 Glove source，并读取 Exo 设备信息 |
 | `telemetry` | 是 | 读取左右 Glove pose/status、Exo telemetry 及 Exo status |
+| `glove_retargeting` | 是 | 使用同一算法包读取左右 Glove retargeting 输出；需要目标手算法包 |
 | `imu` | 是 | 读取 Exo IMU，并提示当前 composite CDC 不提供 Glove `0x10/0x81` 原始 IMU |
 | `glove_haptics` | 是 | 通过共享串口设置和清除左右 Glove 触觉反馈 |
 | `lifecycle` | 是 | 演示启动、读取一次、停止和关闭 |
@@ -71,6 +74,7 @@ cmake --build build --config Release
 ```bash
 ./build/device_info --port /dev/ttyUSB0
 ./build/telemetry --port /dev/ttyUSB0
+./build/glove_retargeting --port /dev/ttyUSB0 --package-id <package-id>
 ./build/imu --port /dev/ttyUSB0
 ./build/glove_haptics --port /dev/ttyUSB0
 ./build/lifecycle --port /dev/ttyUSB0
@@ -80,6 +84,7 @@ Windows 请将串口替换为实际的 `COM` 端口，例如 `--port COM3`。
 
 持续运行的示例会打印数据直到按 `Ctrl+C` 停止。`lifecycle` 和 `glove_haptics` 会自行完成
 停止和关闭。
+`glove_retargeting` 的 `--package-id` 必须是已经通过产品 CLI 安装的算法包 ID。
 
 组合示例默认使用根 `Sdk` 执行整体启动、停止和关闭，并按 Glove 的 `side`
 以及唯一 Exo 成员访问设备。`quick_start` 没有算法目标，启动后由无任务运行器保持等待，直到按 `Ctrl+C` 请求停止。

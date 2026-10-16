@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 
 from qnbot_sdk import (
     DeviceSelector,
@@ -8,10 +9,12 @@ from qnbot_sdk import (
     Sdk,
     SerialConnection,
     Side,
+    SleepResult,
     TargetAlgorithm,
     TargetConfig,
 )
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
+
 
 def print_output(sample: Sample[HandJointCommand]) -> None:
     print(
@@ -62,7 +65,8 @@ def main() -> None:
         glove.start()
         for _ in range(options.updates):
             update = glove.update()
-            update.sleep()
+            if update.sleep() is SleepResult.NO_TASKS:
+                time.sleep(0.01)
             sample = output.latest()
             if sample is not None:
                 print_output(sample)

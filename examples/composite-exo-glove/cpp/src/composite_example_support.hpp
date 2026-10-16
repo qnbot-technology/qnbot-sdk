@@ -90,6 +90,18 @@ inline void print_values(const std::array<double, N>& values) {
     std::cout << ']';
 }
 
+inline void print_output(const qnbot::Sample<qnbot::HandJointCommand>& sample) {
+    std::cout << "retargeting sequence=" << sample.sequence
+              << " target=" << sample.value.target << " joints={";
+    bool first = true;
+    for (const auto& joint : sample.value.joints) {
+        if (!first) std::cout << ", ";
+        std::cout << joint.first << ": " << joint.second;
+        first = false;
+    }
+    std::cout << "}\n";
+}
+
 inline int report_error(const std::exception& error) {
     std::cerr << "qnbot composite example failed: " << error.what() << '\n';
     return EXIT_FAILURE;

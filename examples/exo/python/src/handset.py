@@ -27,7 +27,11 @@ def main() -> None:
     options = arguments.parse_args()
 
     sdk = Sdk(
-        devices=(ExoConfig(connection=SerialConnection(port=options.port)),)
+        devices=(
+            ExoConfig(
+                connection=SerialConnection(port=options.port),
+            ),
+        ),
     )
     exo = sdk.exo()
     device = exo.device()

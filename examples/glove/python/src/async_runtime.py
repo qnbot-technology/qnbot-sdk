@@ -14,6 +14,7 @@ from qnbot_sdk import (
 )
 from qnbot_sdk.glove import GloveConfig, HandJointCommand
 
+
 def print_output(origin: str, sample: Sample[HandJointCommand]) -> None:
     print(
         f"{origin} retargeting sequence={sample.sequence} "

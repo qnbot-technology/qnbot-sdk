@@ -28,7 +28,14 @@ inline qnbot::ExternalGloveFrame frame(std::uint64_t step) {
     return result;
 }
 
-inline std::string parse_package_id(int argc, char** argv) {
+struct Options {
+    std::string package_id;
+    qnbot::CaptureInteractionMode interaction =
+        qnbot::CaptureInteractionMode::auto_terminal;
+};
+
+inline Options parse_options(int argc, char** argv) {
+    Options options;
     std::optional<std::string> package_id;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
@@ -37,31 +44,46 @@ inline std::string parse_package_id(int argc, char** argv) {
                 throw std::invalid_argument(
                     "--package-id may be provided once");
             package_id = example::require_value(argc, argv, index, argument);
+        } else if (argument == "--capture-interaction") {
+            const auto value =
+                example::require_value(argc, argv, index, argument);
+            if (value == "auto_terminal") {
+                options.interaction =
+                    qnbot::CaptureInteractionMode::auto_terminal;
+            } else if (value == "external") {
+                options.interaction = qnbot::CaptureInteractionMode::external;
+            } else {
+                throw std::invalid_argument(
+                    "--capture-interaction must be auto_terminal or external");
+            }
         } else {
             throw std::invalid_argument("unknown argument: " + argument);
         }
     }
     if (!package_id) throw std::invalid_argument("--package-id is required");
-    return *package_id;
+    options.package_id = *package_id;
+    return options;
 }
 
-inline qnbot::SdkConfig make_config(const std::string& package_id) {
+inline qnbot::SdkConfig make_config(const Options& options) {
     qnbot::GloveConfig glove{
-        std::string{"external"}, qnbot::Side::right,
-        qnbot::ExternalConnection{}, true};
+        std::string{"external"},
+        qnbot::Side::right,
+        qnbot::ExternalConnection{},
+        true,
+    };
 
     qnbot::TargetConfig target;
     target.source =
         qnbot::DeviceSelector{"glove", std::nullopt, qnbot::Side::right};
     target.name = "hand";
     target.side = qnbot::Side::right;
-    target.algorithms = {qnbot::TargetAlgorithm{package_id}};
+    target.algorithms = {qnbot::TargetAlgorithm{options.package_id}};
 
     qnbot::SdkConfig config;
     config.devices.push_back(glove);
     config.targets.push_back(target);
-    config.algorithms.capture.interaction =
-        qnbot::CaptureInteractionMode::external;
+    config.algorithms.capture.interaction = options.interaction;
     return config;
 }
 

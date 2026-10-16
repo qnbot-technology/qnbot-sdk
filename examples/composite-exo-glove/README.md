@@ -1,7 +1,7 @@
 # QnBot SDK Exo+Glove 共享串口示例
 
 本目录演示一台 Exo 和左右两只 Glove 通过同一个共享串口接入，并在一个 SDK 实例中分别访问三个成员。
-Python 和 C++ 示例覆盖自动发现、显式串口、设备信息、遥测、Exo IMU、Glove 触觉和基础生命周期。
+Python 和 C++ 示例覆盖自动发现、显式串口、设备信息、遥测、Glove retargeting 输出、Exo IMU、Glove 触觉和基础生命周期。
 
 ## 目录
 
@@ -14,6 +14,7 @@ Python 和 C++ 示例覆盖自动发现、显式串口、设备信息、遥测�
 - 一台同时提供 Exo、左 Glove 与右 Glove 数据的受支持设备；
 - Python 同时安装 `qnbot-sdk-exo` 和 `qnbot-sdk-glove`；
 - C++ 同时安装对应版本的 Exo 与 Glove 交付包。
+- 运行 `glove_retargeting` 还需要按对应语言的 Glove 示例说明安装目标手算法包。
 
 ## 支持的配置方式
 
@@ -49,4 +50,5 @@ sdk.close()
 
 - 找不到设备：确认组合设备已连接，且共享串口没有被其他程序占用。
 - 只有一个成员有输出：确认设备固件同时提供 Exo、左 Glove 和右 Glove 数据，并检查三个成员的信息。
+- 运行中共享串口断开：已启动的成员会显示 `connected=false`、`stale=true`；设备重新出现在原串口后，SDK 会恢复仍需运行的成员，各成员成功恢复后才增加自己的 `reconnect_count`。如果设备改用了另一串口，请停止并重新创建 SDK，指定新端口；当前实例不会切换端口。
 - C++ 找不到包：确认 `CMAKE_PREFIX_PATH` 同时包含 Exo 和 Glove 的 CMake 配置文件。

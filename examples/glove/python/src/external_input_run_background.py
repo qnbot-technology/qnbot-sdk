@@ -26,7 +26,6 @@ from qnbot_sdk.glove import (
     ExternalGloveFrame,
     GloveConfig,
     GloveNodePose,
-    GlovePose,
     HandJointCommand,
 )
 
@@ -50,11 +49,9 @@ def frame(step: int) -> ExternalGloveFrame:
     )
 
 
-def handle_capture_prompt(
+def check_preparation(
     capture_progress: ReadChannel[CaptureProgress],
-    capture_control: CaptureControl,
     calibration_progress: ReadChannel[CalibrationProgress],
-    handled_request_ids: set[str],
 ) -> None:
     capture = capture_progress.latest()
     if capture is not None:
@@ -62,21 +59,8 @@ def handle_capture_prompt(
         if value.session_state is CaptureSessionState.FAILED:
             message = value.failure.message if value.failure else "unknown error"
             raise RuntimeError(f"external input capture failed: {message}")
-        stage = value.stage
-        if (
-            stage.state is CaptureStageState.AWAITING_CONFIRMATION
-            and stage.request_id is not None
-            and stage.request_id not in handled_request_ids
-        ):
-            answer = input(
-                f"{stage.prompt or 'Continue capture'} [Y/n]: "
-            ).strip().lower()
-            if answer in ("", "y", "yes"):
-                capture_control.confirm(stage.request_id)
-            else:
-                capture_control.cancel(stage.request_id)
-                raise RuntimeError("external input capture was cancelled")
-            handled_request_ids.add(stage.request_id)
+        if value.session_state is CaptureSessionState.CANCELLED:
+            raise RuntimeError("external input capture was cancelled")
     calibration = calibration_progress.latest()
     if (
         calibration is not None
@@ -87,11 +71,40 @@ def handle_capture_prompt(
         raise RuntimeError(f"external input calibration failed: {message}")
 
 
+def handle_capture_prompt(
+    capture_progress: ReadChannel[CaptureProgress],
+    capture_control: CaptureControl,
+    handled_request_ids: set[str],
+) -> None:
+    capture = capture_progress.latest()
+    if capture is not None:
+        stage = capture.value.stage
+        if (
+            stage.state is CaptureStageState.AWAITING_CONFIRMATION
+            and stage.request_id is not None
+            and stage.request_id not in handled_request_ids
+        ):
+            prompt = stage.prompt_en or stage.prompt or "Continue capture"
+            answer = input(f"{prompt} [Y/n]: ").strip().lower()
+            if answer in ("", "y", "yes"):
+                capture_control.confirm(stage.request_id)
+            else:
+                capture_control.cancel(stage.request_id)
+                raise RuntimeError("external input capture was cancelled")
+            handled_request_ids.add(stage.request_id)
+
+
 def main() -> None:
     arguments = argparse.ArgumentParser(
         description="Push external frames while the SDK runs in the background"
     )
     arguments.add_argument("--package-id", required=True)
+    arguments.add_argument(
+        "--capture-interaction",
+        choices=("auto_terminal", "external"),
+        default="auto_terminal",
+        help="SDK 终端引导（默认）；external 由应用显示提示并确认。标定期间持续推帧。",
+    )
     options = arguments.parse_args()
 
     sdk = Sdk(
@@ -111,7 +124,9 @@ def main() -> None:
             ),
         ),
         algorithms=AlgorithmsConfig(
-            capture=CaptureConfig(interaction=CaptureInteractionMode.EXTERNAL),
+            capture=CaptureConfig(
+                interaction=CaptureInteractionMode(options.capture_interaction)
+            ),
         ),
     )
     glove = sdk.glove()
@@ -123,45 +138,45 @@ def main() -> None:
     control = device.capture_control()
     handled_request_ids: set[str] = set()
 
-    def print_pose(sample: Sample[GlovePose]) -> None:
-        print(f"pose callback sequence={sample.sequence}")
-
     def print_output(sample: Sample[HandJointCommand]) -> None:
         print(
             f"retargeting output callback sequence={sample.sequence} "
             f"target={sample.value.target} joints={sample.value.joints}"
         )
 
-    pose.subscribe(print_pose)
     output.subscribe(print_output)
-    device.start()
-    glove.run_background()
+    try:
+        device.start()
+        glove.run_background()
 
-    deadline = time.monotonic() + 60.0
-    step = 1
-    while output.latest() is None and time.monotonic() < deadline:
-        current = device.push_frame(frame(step))
-        if step == 1:
-            print(f"pushed pose sequence={current.meta.sequence}")
-        handle_capture_prompt(
-            capture_progress,
-            control,
-            calibration_progress,
-            handled_request_ids,
-        )
-        step += 1
-        time.sleep(0.01)
+        try:
+            deadline = time.monotonic() + 60.0
+            step = 1
+            while output.latest() is None and time.monotonic() < deadline:
+                check_preparation(capture_progress, calibration_progress)
+                device.push_frame(frame(step))
+                if options.capture_interaction == "external":
+                    handle_capture_prompt(
+                        capture_progress,
+                        control,
+                        handled_request_ids,
+                    )
+                step += 1
+                time.sleep(0.01)
 
-    latest_pose = pose.latest()
-    latest_output = output.latest()
-    if latest_pose is None or latest_output is None:
-        raise RuntimeError("external input did not publish pose and retargeting output")
-    print(f"latest pose sequence={latest_pose.sequence}")
-    print(f"latest retargeting output sequence={latest_output.sequence}")
+            latest_pose = pose.latest()
+            latest_output = output.latest()
+            if latest_pose is None or latest_output is None:
+                raise RuntimeError(
+                    "external input did not publish pose and retargeting output"
+                )
+            print(f"latest retargeting output sequence={latest_output.sequence}")
 
-    glove.request_stop()
-    glove.join()
-    glove.close()
+        finally:
+            glove.request_stop()
+            glove.join()
+    finally:
+        glove.close()
     print("external background input complete")
 
 

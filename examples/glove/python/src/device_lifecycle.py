@@ -14,6 +14,7 @@ from qnbot_sdk import (
     Sdk,
     SerialConnection,
     Side,
+    SleepResult,
     TargetAlgorithm,
     TargetConfig,
 )
@@ -26,6 +27,7 @@ from qnbot_sdk.glove import (
     GloveConfig,
     HandJointCommand,
 )
+
 
 def print_output(device_name: str, sample: Sample[HandJointCommand]) -> None:
     print(
@@ -52,9 +54,8 @@ def handle_capture_prompt(
             and stage.request_id is not None
             and stage.request_id not in handled_request_ids
         ):
-            answer = (
-                input(f"{stage.prompt or 'Continue capture'} [Y/n]: ").strip().lower()
-            )
+            prompt = stage.prompt_en or stage.prompt or "Continue capture"
+            answer = input(f"{prompt} [Y/n]: ").strip().lower()
             if answer in ("", "y", "yes"):
                 capture_control.confirm(stage.request_id)
             else:
@@ -147,7 +148,8 @@ def main() -> None:
                 calibration_progress,
                 handled_request_ids,
             )
-            update.sleep()
+            if update.sleep() is SleepResult.NO_TASKS:
+                time.sleep(0.01)
         if output.latest() is None:
             raise RuntimeError("retargeting output was not ready before the timeout")
 
@@ -166,7 +168,8 @@ def main() -> None:
 
     for _ in range(options.updates):
         update = glove.update()
-        update.sleep()
+        if update.sleep() is SleepResult.NO_TASKS:
+            time.sleep(0.01)
         left_sample = left_output.latest()
         if left_sample is not None:
             print_output("left", left_sample)
@@ -186,7 +189,8 @@ def main() -> None:
     left_sample = None
     for _ in range(options.updates):
         update = glove.update()
-        update.sleep()
+        if update.sleep() is SleepResult.NO_TASKS:
+            time.sleep(0.01)
         right_candidate = right_output.latest()
         if (
             right_candidate is not None
@@ -210,7 +214,8 @@ def main() -> None:
     right_sample = None
     for _ in range(options.updates):
         update = glove.update()
-        update.sleep()
+        if update.sleep() is SleepResult.NO_TASKS:
+            time.sleep(0.01)
         candidate = right_output.latest()
         if candidate is not None and candidate.sequence > right_before_restart.sequence:
             right_sample = candidate

@@ -7,6 +7,8 @@
 - Python 3.10 或更高版本；
 - 一台同时提供 Exo、左 Glove 与右 Glove 数据的受支持设备；
 - 已安装 `qnbot-sdk-exo` 和 `qnbot-sdk-glove`。
+- 运行 `glove_retargeting.py` 还需要按 [Glove 示例说明](../../glove/python/README.md) 安装与当前 SDK
+  和平台匹配的目标手算法包。
 
 ## 安装
 
@@ -38,7 +40,12 @@ python src/discover_exo_glove.py
 python src/quick_start.py
 ```
 
-需要固定共享串口时，其他示例可以使用 `--port` 指定实际串口。
+需要固定共享串口时，其他示例可以使用 `--port` 指定实际串口。需要读取 retargeting 输出时，
+使用已安装算法包的 ID 运行：
+
+```bash
+python src/glove_retargeting.py --port /dev/ttyUSB0 --package-id <package-id>
+```
 
 ## 示例列表
 
@@ -48,11 +55,12 @@ python src/quick_start.py
 | `quick_start.py` | 使用默认自动发现创建组合设备，并通过同一 SDK 访问 Exo 和左右两只 Glove |
 | `device_info.py` | 显示左右 Glove source，并读取 Exo 设备信息 |
 | `telemetry.py` | 读取左右 Glove pose/status、Exo telemetry 和 Exo status |
+| `glove_retargeting.py` | 使用同一算法包读取左右 Glove retargeting 输出；需要目标手算法包 |
 | `imu.py` | 读取 Exo IMU，并提示当前 composite CDC 不提供 Glove `0x10/0x81` 原始 IMU |
 | `glove_haptics.py` | 通过共享串口设置和清除左右 Glove haptics |
 | `lifecycle.py` | 演示 start、一次读取、stop、close |
 
-`telemetry.py` 和 `imu.py` 会持续运行，按 `Ctrl+C` 停止。`glove_haptics.py` 的 `--hold` 参数以秒为单位控制保持时间。
+`telemetry.py`、`glove_retargeting.py` 和 `imu.py` 会持续运行，按 `Ctrl+C` 停止。`glove_haptics.py` 的 `--hold` 参数以秒为单位控制保持时间。`glove_retargeting.py` 的 `--package-id` 必须是已经通过产品 CLI 安装的算法包 ID。
 
 组合示例默认使用根 `Sdk` 执行整体启动、停止和关闭，并按 Glove 的 `side`
 以及唯一 Exo 成员访问设备。推荐生命周期顺序是：
