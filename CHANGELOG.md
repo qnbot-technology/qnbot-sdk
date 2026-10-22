@@ -8,6 +8,9 @@
 
 ## 未发布
 
+- 组合设备的 Glove 触觉示例明确显示当前请求成功返回但被忽略、无实际振动，并提示不可用警告；不再把成功请求描述为硬件已执行。
+- 组合 IMU 示例先检查 Exo IMU 能力，不支持时提示并退出；Python 与 C++ 保持一致。组合示例按产品发布说明选择兼容同一 Core 版本的独立版本组件。
+
 - Glove 普通示例统一使用默认自动标定；只有 `host_capture_calibration` 显式选择手动标定，先启动设备再采集、标定。旧版未启动设备就调用 `start_capture` 的顺序会失败并提示先启动设备。
 - 公开示例按组件重新组织为 `examples/glove/`、`examples/exo/` 和 `examples/composite-exo-glove/`，每个组件各自提供独立的 Python 和 C++ 工程；此前 `examples/python/` 和 `examples/cpp/` 下的示例路径全部变更。
 - 新增 Exo 外骨骼组件的 Python 和 C++ 示例：设备发现、快速运行、设备信息、遥测与状态、IMU、手柄、触觉反馈和多设备生命周期。

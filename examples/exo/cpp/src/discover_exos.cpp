@@ -8,13 +8,18 @@ int main() {
     try {
         for (const auto& device : qnbot::discover_exos()) {
             if (device.error) {
-                std::cout << "port=" << device.port
+                std::cout << "transport_type="
+                          << qnbot::exo_transport_type_name(
+                                 device.transport_type)
+                          << " port=" << device.port
                           << " error=" << device.error->message << '\n';
                 continue;
             }
             if (!device.device_info) continue;
             const auto& info = *device.device_info;
-            std::cout << "port=" << device.port
+            std::cout << "transport_type="
+                      << qnbot::exo_transport_type_name(device.transport_type)
+                      << " port=" << device.port
                       << " product=" << static_cast<int>(info.product)
                       << " protocol="
                       << static_cast<int>(info.protocol_version.major) << '.'

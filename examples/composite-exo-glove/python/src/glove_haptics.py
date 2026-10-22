@@ -10,7 +10,7 @@ from qnbot_sdk.glove import GloveConfig, GloveFinger, GloveHaptics
 
 def main() -> None:
     arguments = argparse.ArgumentParser(
-        description="Control Glove haptics in a composite"
+        description="Observe ignored Glove haptics requests in a composite"
     )
     arguments.add_argument("--port", required=True, help="Shared serial port")
     arguments.add_argument("--hold", type=float, default=1.0)
@@ -40,11 +40,16 @@ def main() -> None:
         right = right_device.haptics()
         left.set(value)
         right.set(value)
-        print("set Glove haptics on left and right Glove")
+        print(
+            "Composite Glove haptics requests ignored; no physical haptics output "
+            "(composite_glove_haptics_unavailable warning)"
+        )
         time.sleep(options.hold)
         left.clear()
         right.clear()
-        print("Glove haptics cleared")
+        print(
+            "Composite Glove haptics clear requests ignored; no physical haptics output"
+        )
     finally:
         sdk.stop()
         sdk.close()

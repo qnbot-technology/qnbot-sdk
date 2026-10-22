@@ -1,7 +1,7 @@
 # QnBot SDK Exo+Glove 共享串口示例
 
 本目录演示一台 Exo 和左右两只 Glove 通过同一个共享串口接入，并在一个 SDK 实例中分别访问三个成员。
-Python 和 C++ 示例覆盖自动发现、显式串口、设备信息、遥测、Glove retargeting 输出、Exo IMU、Glove 触觉和基础生命周期。
+Python 和 C++ 示例覆盖自动发现、显式串口、设备信息、遥测、Glove retargeting 输出、Exo IMU、Glove 触觉请求和基础生命周期。
 
 ## 目录
 
@@ -13,7 +13,7 @@ Python 和 C++ 示例覆盖自动发现、显式串口、设备信息、遥测�
 - Python 3.10 或更高版本，或支持 C++17 的编译器和 CMake 3.16+；
 - 一台同时提供 Exo、左 Glove 与右 Glove 数据的受支持设备；
 - Python 同时安装 `qnbot-sdk-exo` 和 `qnbot-sdk-glove`；
-- C++ 同时安装对应版本的 Exo 与 Glove 交付包。
+- C++ 同时安装相互兼容的 Exo 与 Glove 交付包；组件版本独立，按产品发布说明选择可共用同一 Core 版本的组合。
 - 运行 `glove_retargeting` 还需要按对应语言的 Glove 示例说明安装目标手算法包。
 
 ## 支持的配置方式
@@ -45,6 +45,11 @@ sdk.close()
 
 只有需要单独控制某个成员领域时，才调用 `glove.start()`、`glove.stop()`、
 `exo.start()` 或 `exo.stop()`。
+
+## 示例的预期结果
+
+- `imu` 读取设备报告支持的 Exo IMU；设备没有该能力时会提示并退出。共享设备连接当前不提供 Glove 原始 IMU。
+- `glove_haptics` 会调用左右 Glove 的设置和清除接口；当前组合设备的触觉暂不可用，请求成功返回但被忽略，不产生实际振动，并报告 `composite_glove_haptics_unavailable` 警告。示例打印的成功请求不代表硬件已执行。
 
 ## 常见问题
 

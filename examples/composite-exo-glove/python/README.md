@@ -12,6 +12,8 @@
 
 ## 安装
 
+Exo 与 Glove 的版本号独立；按产品发布说明选择可共用同一 Core 版本的兼容组件组合。
+
 使用产品交付的 Python 安装包：
 
 ```bash
@@ -56,11 +58,16 @@ python src/glove_retargeting.py --port /dev/ttyUSB0 --package-id <package-id>
 | `device_info.py` | 显示左右 Glove source，并读取 Exo 设备信息 |
 | `telemetry.py` | 读取左右 Glove pose/status、Exo telemetry 和 Exo status |
 | `glove_retargeting.py` | 使用同一算法包读取左右 Glove retargeting 输出；需要目标手算法包 |
-| `imu.py` | 读取 Exo IMU，并提示当前 composite CDC 不提供 Glove `0x10/0x81` 原始 IMU |
-| `glove_haptics.py` | 通过共享串口设置和清除左右 Glove haptics |
+| `imu.py` | 读取设备支持的 Exo IMU；无此能力时提示并退出；共享连接不提供 Glove 原始 IMU |
+| `glove_haptics.py` | 提交左右 Glove 触觉请求并报告当前请求被忽略、无实际振动 |
 | `lifecycle.py` | 演示 start、一次读取、stop、close |
 
 `telemetry.py`、`glove_retargeting.py` 和 `imu.py` 会持续运行，按 `Ctrl+C` 停止。`glove_haptics.py` 的 `--hold` 参数以秒为单位控制保持时间。`glove_retargeting.py` 的 `--package-id` 必须是已经通过产品 CLI 安装的算法包 ID。
+
+`glove_haptics.py` 当前不会产生实际振动：组合设备的触觉请求成功返回但被忽略，
+并报告 `composite_glove_haptics_unavailable` 警告。`set()` 后读取到的触觉值为空，
+`clear()` 同样不会驱动硬件。观察该提示和警告即为当前示例的预期结果。
+`imu.py` 遇到没有 Exo IMU 能力的设备时，会打印 `this device reports no Exo IMU` 并关闭 SDK。
 
 组合示例默认使用根 `Sdk` 执行整体启动、停止和关闭，并按 Glove 的 `side`
 以及唯一 Exo 成员访问设备。推荐生命周期顺序是：

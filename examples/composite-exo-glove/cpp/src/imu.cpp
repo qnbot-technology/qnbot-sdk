@@ -28,8 +28,13 @@ int main(int argc, char** argv) {
         auto exo = sdk.exo();
         auto exo_device = exo.device();
         std::cout
-            << "Glove raw IMU (Telemetry.ImuRawSnapshot, 0x10/0x81) is not "
-               "exposed on the composite CDC path; reading Exo IMU only\n";
+            << "Glove raw IMU is unavailable on this shared-device connection; "
+               "reading supported Exo IMU only\n";
+        if (!exo_device.get_device_info().capabilities.imus) {
+            std::cout << "this device reports no Exo IMU\n";
+            sdk.close();
+            return EXIT_SUCCESS;
+        }
         const auto exo_subscription = exo_device.telemetry().subscribe(
             [](const qnbot::Sample<qnbot::ExoTelemetry>& sample) {
                 print_exo_imu(sample.value);

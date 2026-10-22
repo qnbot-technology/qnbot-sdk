@@ -23,11 +23,14 @@ int main(int argc, char** argv) {
         auto right = right_device.haptics();
         left.set(value);
         right.set(value);
-        std::cout << "set Glove haptics on left and right Glove\n";
+        std::cout << "Composite Glove haptics requests ignored; no physical "
+                     "haptics output "
+                     "(composite_glove_haptics_unavailable warning)\n";
         std::this_thread::sleep_for(std::chrono::seconds(1));
         left.clear();
         right.clear();
-        std::cout << "Glove haptics cleared\n";
+        std::cout << "Composite Glove haptics clear requests ignored; "
+                     "no physical haptics output\n";
         sdk.stop();
         sdk.close();
         return EXIT_SUCCESS;

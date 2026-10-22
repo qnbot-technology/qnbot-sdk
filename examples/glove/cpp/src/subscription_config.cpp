@@ -42,12 +42,15 @@ int main(int argc, char** argv) {
         qnbot::Sdk sdk(example::serial_config(port, *side));
         auto glove = sdk.glove();
         auto device = glove.device();
+        std::size_t count = 0;
+        std::uint64_t last_sequence = 0;
+        std::chrono::steady_clock::time_point first_at, last_at;
         const auto subscription = device.pose().with_config(config).subscribe(
-            [](const qnbot::Sample<qnbot::GlovePose>& sample) {
-                std::cout << "pose sequence=" << sample.sequence
-                          << " fingertips="
-                          << sample.value.payload.fingertip_local.size()
-                          << '\n';
+            [&](const qnbot::Sample<qnbot::GlovePose>& sample) {
+                last_at = std::chrono::steady_clock::now();
+                if (count == 0) first_at = last_at;
+                ++count;
+                last_sequence = sample.sequence;
             });
         try {
             glove.start();
@@ -63,6 +66,13 @@ int main(int argc, char** argv) {
         }
         static_cast<void>(subscription);
         glove.close();
+        const double observed_hz =
+            count > 1
+                ? static_cast<double>(count - 1) /
+                      std::chrono::duration<double>(last_at - first_at).count()
+                : 0.0;
+        std::cout << "samples=" << count << " observed_hz=" << observed_hz
+                  << " last_sequence=" << last_sequence << '\n';
         std::cout << "subscription complete\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

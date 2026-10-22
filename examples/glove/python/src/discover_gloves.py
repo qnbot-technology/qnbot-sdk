@@ -1,29 +1,23 @@
 from __future__ import annotations
 
-from qnbot_sdk import SerialConnection
-from qnbot_sdk.glove import GloveConfig, discover_gloves
+from qnbot_sdk.glove import discover_gloves
 
 
 def main() -> None:
     discovered = discover_gloves()
+    print(f"discovered records={len(discovered)}")
     for device in discovered:
+        hand = device.hand.value if device.hand is not None else "unknown"
+        sn = device.sn if device.sn is not None else "unknown"
+        status = "error" if device.error is not None else "ok"
+        information = f"transport_type={device.transport_type.value} port={device.port} hand={hand} sn={sn} status={status}"
         if device.error is not None:
             print(
-                f"port={device.port} error={device.error.code.value} "
+                f"{information} error={device.error.code.value} "
                 f"message={device.error.message}"
             )
-            continue
-        print(f"port={device.port} hand={device.hand.value} sn={device.sn}")
-
-    selected = next((device for device in discovered if device.error is None), None)
-    if selected is None or selected.hand is None:
-        return
-
-    config = GloveConfig(
-        side=selected.hand,
-        connection=SerialConnection(port=selected.port),
-    )
-    print(f"selected port={config.connection.port} hand={config.side.value}")
+        else:
+            print(information)
 
 
 if __name__ == "__main__":
