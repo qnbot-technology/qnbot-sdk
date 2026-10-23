@@ -7,13 +7,13 @@ def main() -> None:
     for device in discover_exos():
         if device.error is not None:
             print(
-                f"port={device.port} error={device.error.code.value} "
+                f"transport_type={device.transport_type.value} port={device.port} error={device.error.code.value} "
                 f"message={device.error.message}"
             )
             continue
         info = device.device_info
         print(
-            f"port={device.port} product={info.product.name} "
+            f"transport_type={device.transport_type.value} port={device.port} product={info.product.name} "
             f"protocol={info.protocol_version.major}.{info.protocol_version.minor} "
             f"sn={info.serial_number} name={info.hardware_name}"
         )

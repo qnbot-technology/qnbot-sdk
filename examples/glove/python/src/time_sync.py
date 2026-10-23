@@ -3,15 +3,23 @@ from __future__ import annotations
 import time
 
 from qnbot_sdk import Sample, Sdk
-from qnbot_sdk.glove import GloveConfig, GlovePose
+from qnbot_sdk.glove import GloveConfig, GlovePose, GloveStatus
 
 SYNC_INTERVAL_SECONDS = 1.0
 
 
 def print_pose(sample: Sample[GlovePose]) -> None:
     print(
-        f"pose sequence={sample.sequence} "
+        f"pose sequence={sample.sequence} source_time_ms={sample.source_time} "
+        f"observed_at_ms={sample.observed_at} "
         f"fingertips={sample.value.payload.fingertip_local}"
+    )
+
+
+def print_status(sample: Sample[GloveStatus]) -> None:
+    print(
+        f"status source_time_ms={sample.source_time} "
+        f"observed_at_ms={sample.observed_at} connected={sample.value.connected}"
     )
 
 
@@ -35,6 +43,7 @@ def main() -> None:
 
     device = glove.device()
     device.pose().subscribe(print_pose)
+    device.status().subscribe(print_status)
 
     glove.start()
     glove.run_background()

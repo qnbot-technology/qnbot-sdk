@@ -176,7 +176,7 @@ def calibrate(
             )
         if snapshot.state is CalibrationSessionState.CANCELLED:
             calibration.close()
-            raise RuntimeError("calibration cancelled")
+            raise RuntimeError("calibration cancelled: this attempt was interrupted")
         update = glove.update()
         if update.sleep() is SleepResult.NO_TASKS:
             time.sleep(0.01)

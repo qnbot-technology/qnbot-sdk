@@ -234,7 +234,8 @@ void calibrate(qnbot::GloveDevice& device, qnbot::Glove& glove,
         }
         if (snapshot.state == qnbot::CalibrationSessionState::cancelled) {
             calibration.close();
-            throw std::runtime_error("calibration cancelled");
+            throw std::runtime_error(
+                "calibration cancelled: this attempt was interrupted");
         }
         update_or_wait(glove);
     }

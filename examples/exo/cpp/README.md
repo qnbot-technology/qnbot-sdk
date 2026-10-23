@@ -73,6 +73,9 @@ cmake --build build --config Release
 
 Windows 请将串口替换为实际的 `COM` 端口，例如 `--port COM3`。
 
+运行 `discover_exos` 或 `device_info` 后，`sn=` 显示设备提供的序列号；当前主控应显示
+完整的 16 位值并保留大小写。设备未提供序列号时不输出 `sn=` 字段。
+
 ## 参数说明
 
 - `--port`：设备串口；使用该参数的示例必须显式提供。

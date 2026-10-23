@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <iomanip>
 #include <thread>
 #include <utility>
 
@@ -38,6 +39,7 @@ double external_reference_time_ms() {
 int main() {
     try {
         std::signal(SIGINT, handle_sigint);
+        std::cout << std::setprecision(16);
         qnbot::SdkConfig config;
         config.devices = {qnbot::GloveConfig{}};
 
@@ -50,6 +52,12 @@ int main() {
         const auto subscription = device.pose().subscribe(
             [](const qnbot::Sample<qnbot::GlovePose>& sample) {
                 std::cout << "pose sequence=" << sample.sequence
+                          << " source_time_ms=";
+                if (sample.source_time)
+                    std::cout << *sample.source_time;
+                else
+                    std::cout << "none";
+                std::cout << " observed_at_ms=" << sample.observed_at
                           << " fingertips={";
                 bool first = true;
                 for (const auto& [finger, node] :
@@ -66,6 +74,17 @@ int main() {
                     first = false;
                 }
                 std::cout << "}\n";
+            });
+
+        const auto status_subscription = device.status().subscribe(
+            [](const qnbot::Sample<qnbot::GloveStatus>& sample) {
+                std::cout << "status source_time_ms=";
+                if (sample.source_time)
+                    std::cout << *sample.source_time;
+                else
+                    std::cout << "none";
+                std::cout << " observed_at_ms=" << sample.observed_at
+                          << " connected=" << sample.value.connected << '\n';
             });
 
         glove.start();
@@ -87,6 +106,7 @@ int main() {
         glove.join();
         glove.close();
         static_cast<void>(subscription);
+        static_cast<void>(status_subscription);
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         std::cerr << "qnbot time sync example failed: " << error.what() << '\n';

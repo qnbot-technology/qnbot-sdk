@@ -38,13 +38,15 @@ def main() -> None:
         )
     )
     try:
-        glove = sdk.glove()
         exo = sdk.exo()
         exo_device = exo.device()
         print(
-            "Glove raw IMU (Telemetry.ImuRawSnapshot, 0x10/0x81) is not exposed "
-            "on the composite CDC path; reading Exo IMU only",
+            "Glove raw IMU is unavailable on this shared-device connection; "
+            "reading supported Exo IMU only",
         )
+        if not exo_device.get_device_info().capabilities.imus:
+            print("this device reports no Exo IMU")
+            return
         exo_device.telemetry().subscribe(print_exo_imu)
         sdk.start()
         print("running; press Ctrl+C to stop")

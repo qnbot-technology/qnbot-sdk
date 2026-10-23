@@ -27,7 +27,7 @@ sdk.close();
 
 - CMake 3.16 或更高版本；
 - 支持 C++17 的编译器；
-- 同一版本的 QnBot C++ Exo 和 Glove 交付包。
+- 相互兼容的 QnBot C++ Exo 和 Glove 交付包；组件版本独立，按产品发布说明选择可共用同一 Core 版本的组合。
 - 运行 `glove_retargeting` 还需要按 [Glove 示例说明](../../glove/cpp/README.md) 安装与当前 SDK
   和平台匹配的目标手算法包。
 
@@ -56,8 +56,8 @@ cmake --build build --config Release
 | `device_info` | 是 | 展示左右 Glove source，并读取 Exo 设备信息 |
 | `telemetry` | 是 | 读取左右 Glove pose/status、Exo telemetry 及 Exo status |
 | `glove_retargeting` | 是 | 使用同一算法包读取左右 Glove retargeting 输出；需要目标手算法包 |
-| `imu` | 是 | 读取 Exo IMU，并提示当前 composite CDC 不提供 Glove `0x10/0x81` 原始 IMU |
-| `glove_haptics` | 是 | 通过共享串口设置和清除左右 Glove 触觉反馈 |
+| `imu` | 是 | 读取设备支持的 Exo IMU；无此能力时提示并退出；共享连接不提供 Glove 原始 IMU |
+| `glove_haptics` | 是 | 提交左右 Glove 触觉请求并报告当前请求被忽略、无实际振动 |
 | `lifecycle` | 是 | 演示启动、读取一次、停止和关闭 |
 
 ## 运行
@@ -92,10 +92,16 @@ Windows 请将串口替换为实际的 `COM` 端口，例如 `--port COM3`。
 需要了解更多生命周期用法时，请参考 [Exo C++ 生命周期示例](../../exo/cpp/README.md)
 和 [Glove C++ 生命周期示例](../../glove/cpp/README.md)。
 
+`glove_haptics` 当前不会产生实际振动：组合设备的触觉请求成功返回但被忽略，
+并报告 `composite_glove_haptics_unavailable` 警告。`set()` 后读取到的触觉值为空，
+`clear()` 同样不会驱动硬件。观察该提示和警告即为当前示例的预期结果。
+`imu` 遇到没有 Exo IMU 能力的设备时，会打印 `this device reports no Exo IMU` 并关闭 SDK。
+
 ## 常见问题
 
 - CMake 找不到依赖：确认 `CMAKE_PREFIX_PATH` 指向包含 `qnbot_exo` 和 `qnbot_glove`
-  配置文件的 SDK 目录，并且两个交付包版本一致。
+  配置文件的 SDK 目录，并且两个交付包兼容同一 Core 版本。
 - 自动发现没有找到三个成员：确认设备已连接、串口未被其他程序占用；也可以运行其他示例
   时通过 `--port` 指定共享串口。
-- 没有 Exo IMU 或 Glove 触觉输出：设备可能不提供对应能力，示例会输出能力不可用或错误提示。
+- 没有 Exo IMU 输出：先查看设备是否报告 IMU 能力；不支持时示例会提示并退出。
+- 没有 Glove 触觉输出：当前组合连接的请求会被忽略，这是预期结果；成功返回不代表实际振动。
