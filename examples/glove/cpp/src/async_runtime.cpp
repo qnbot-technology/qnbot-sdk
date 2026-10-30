@@ -81,16 +81,57 @@ int main(int argc, char** argv) {
         auto output = device.output(example::default_target_name);
         auto executor = std::make_shared<example::QueueExecutor>();
 
-        glove.start();
-        glove.run_background();
-        for (std::uint64_t index = 0; index < options.samples; ++index) {
-            auto pending = wait_for_output(output, executor, std::stop_token{});
-            example::print_output(pending.get());
+        std::stop_source pending_stop;
+        std::exception_ptr failure;
+        std::exception_ptr runner_failure;
+        std::thread observer;
+        bool background_started = false;
+        try {
+            glove.start();
+            glove.run_background();
+            background_started = true;
+            observer = std::thread([&] {
+                try {
+                    glove.join();
+                } catch (...) {
+                    runner_failure = std::current_exception();
+                }
+                pending_stop.request_stop();
+            });
+            for (std::uint64_t index = 0; index < options.samples; ++index) {
+                auto pending =
+                    wait_for_output(output, executor, pending_stop.get_token());
+                example::print_output(pending.get());
+            }
+        } catch (...) {
+            failure = std::current_exception();
         }
-
-        glove.request_stop();
-        glove.join();
-        glove.close();
+        if (background_started) {
+            try {
+                if (!pending_stop.stop_requested()) glove.request_stop();
+            } catch (const qnbot::LifecycleError&) {
+                // The runner can finish before the stop request reaches it.
+            } catch (const qnbot::ClosedHandleError&) {
+                // The owner can close while output consumption is pending.
+            }
+            if (observer.joinable()) {
+                observer.join();
+            } else {
+                // Thread creation can fail after background startup succeeded.
+                try {
+                    glove.join();
+                } catch (...) {
+                    runner_failure = std::current_exception();
+                }
+            }
+        }
+        if (runner_failure) failure = runner_failure;
+        try {
+            glove.close();
+        } catch (...) {
+            if (!failure) failure = std::current_exception();
+        }
+        if (failure) std::rethrow_exception(failure);
         std::cout << "async runtime complete\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

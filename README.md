@@ -13,20 +13,26 @@
 
 只使用单个组件时，进入对应组件示例；需要共享串口组合设备时，同时安装两个组件并进入 Exo+Glove 示例。
 
+Java 用户同样先选择组件，再阅读 [Glove Java](examples/glove/java/README.md)、[Exo Java](examples/exo/java/README.md) 或 [组合 Java](examples/composite-exo-glove/java/README.md)。在自己的 Android 项目中调用对应源码。
+
+
 ## 仓库内容
 
 ```text
 ├── examples/
-│   ├── glove/             # 手套组件的 Python 与 C++ 示例
+│   ├── glove/               # 手套组件
 │   │   ├── python/
-│   │   └── cpp/
-│   ├── exo/               # 外骨骼组件的 Python 与 C++ 示例
+│   │   ├── cpp/
+│   │   └── java/
+│   ├── exo/                 # 外骨骼组件
 │   │   ├── python/
-│   │   └── cpp/
-│   └── composite-exo-glove/ # Exo+Glove 共享串口示例
+│   │   ├── cpp/
+│   │   └── java/
+│   └── composite-exo-glove/  # 共享串口组合设备
 │       ├── python/
-│       └── cpp/
-├── CHANGELOG.md           # 示例与交付变更
+│       ├── cpp/
+│       └── java/
+├── CHANGELOG.md
 ├── LICENSE
 └── README.md
 ```

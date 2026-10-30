@@ -1,5 +1,10 @@
 #include "example_support.hpp"
 
+#if __has_include(<qnbot/glove/bone_config.hpp>)
+#include <qnbot/glove/bone_config.hpp>
+#define QNBOT_EXAMPLE_HAS_BONE_CONFIG 1
+#endif
+
 #include <chrono>
 #include <cstdlib>
 #include <thread>
@@ -10,12 +15,23 @@ int main(int argc, char** argv) {
         std::optional<qnbot::Side> side;
         std::string package_id;
         std::string operator_id = "default";
+        bool prepare_bone_config = false;
+        bool replace_bone_config = false;
+        std::optional<std::string> bone_config_file;
         auto bone_usage = qnbot::BoneConfigUsage::auto_detect;
         std::string bone_option = "auto";
         std::optional<std::string> algorithm_config_path;
         double seconds = 10.0;
         for (int index = 1; index < argc; ++index) {
             const std::string argument = argv[index];
+            if (argument == "--prepare-bone-config") {
+                prepare_bone_config = true;
+                continue;
+            }
+            if (argument == "--replace-bone-config") {
+                replace_bone_config = true;
+                continue;
+            }
             const auto value =
                 example::require_value(argc, argv, index, argument);
             if (argument == "--port")
@@ -26,6 +42,8 @@ int main(int argc, char** argv) {
                 package_id = value;
             else if (argument == "--operator-id")
                 operator_id = value;
+            else if (argument == "--bone-config-file")
+                bone_config_file = value;
             else if (argument == "--algorithm-config-path")
                 algorithm_config_path = value;
             else if (argument == "--seconds")
@@ -48,6 +66,38 @@ int main(int argc, char** argv) {
         if (!side) throw std::invalid_argument("--side is required");
         if (package_id.empty())
             throw std::invalid_argument("--package-id is required");
+        if (prepare_bone_config && bone_config_file)
+            throw std::invalid_argument(
+                "--prepare-bone-config and --bone-config-file are mutually "
+                "exclusive");
+        if (replace_bone_config && !prepare_bone_config && !bone_config_file)
+            throw std::invalid_argument(
+                "--replace-bone-config requires a preparation option");
+        if (prepare_bone_config || bone_config_file) {
+#if defined(QNBOT_EXAMPLE_HAS_BONE_CONFIG)
+            const auto policy =
+                replace_bone_config
+                    ? qnbot::BoneConfigOverwritePolicy::replace_existing
+                    : qnbot::BoneConfigOverwritePolicy::deny;
+            const auto installed =
+                bone_config_file
+                    ? qnbot::import_bone_config(*bone_config_file, operator_id,
+                                                *side, policy)
+                    : qnbot::prepare_bone_config_terminal(
+                          qnbot::BoneConfigSessionOptions(*side, operator_id),
+                          policy);
+            std::cout << "bone configuration installed: " << installed.path
+                      << std::endl;
+            if (!installed.cleanup_confirmed)
+                std::cout
+                    << "configuration saved; session cleanup not confirmed"
+                    << std::endl;
+#else
+            throw std::invalid_argument(
+                "bone preparation requires matching SDK packages with "
+                "BoneConfigSession support");
+#endif
+        }
         auto config = example::serial_config(port, *side);
         config.algorithms.capture.operator_id = operator_id;
         qnbot::TargetConfig target;
