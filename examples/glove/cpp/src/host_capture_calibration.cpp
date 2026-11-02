@@ -50,7 +50,7 @@ Options parse_options(int argc, char** argv) {
         }
     }
     if (options.package_ids.empty())
-        throw std::invalid_argument("--package-id is required");
+        options.package_ids.push_back(builtin_skeleton_package_id);
     return options;
 }
 

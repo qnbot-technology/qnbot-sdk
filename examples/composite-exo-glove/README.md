@@ -57,3 +57,7 @@ sdk.close()
 - 只有一个成员有输出：确认设备固件同时提供 Exo、左 Glove 和右 Glove 数据，并检查三个成员的信息。
 - 运行中共享串口断开：已启动的成员会显示 `connected=false`、`stale=true`；设备重新出现在原串口后，SDK 会恢复仍需运行的成员，各成员成功恢复后才增加自己的 `reconnect_count`。如果设备改用了另一串口，请停止并重新创建 SDK，指定新端口；当前实例不会切换端口。
 - C++ 找不到包：确认 `CMAKE_PREFIX_PATH` 同时包含 Exo 和 Glove 的 CMake 配置文件。
+
+## Android Java
+
+使用 [Java 示例说明](java/README.md) 获取配套包、调用本组件源码。

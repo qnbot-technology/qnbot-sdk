@@ -193,12 +193,13 @@ def main() -> None:
         "--package-id",
         action="append",
         dest="package_ids",
-        required=True,
         metavar="PACKAGE_ID",
     )
     arguments.add_argument("--force", action="store_true")
     options = arguments.parse_args()
-    package_ids = tuple(dict.fromkeys(options.package_ids))
+    package_ids = tuple(
+        dict.fromkeys(options.package_ids or [BUILTIN_SKELETON_PACKAGE_ID])
+    )
 
     configured = configured_targets(package_ids)
     sdk = Sdk(

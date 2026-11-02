@@ -33,6 +33,10 @@ def main() -> None:
     arguments.add_argument("--side", choices=("left", "right"), required=True)
     arguments.add_argument("--package-id", required=True)
     arguments.add_argument("--operator-id", default="default")
+    preparation = arguments.add_mutually_exclusive_group()
+    preparation.add_argument("--prepare-bone-config", action="store_true")
+    preparation.add_argument("--bone-config-file")
+    arguments.add_argument("--replace-bone-config", action="store_true")
     arguments.add_argument(
         "--use-bone-config", choices=("auto", "true", "false"), default="auto"
     )
@@ -41,7 +45,37 @@ def main() -> None:
     options = arguments.parse_args()
     if not math.isfinite(options.seconds) or options.seconds <= 0:
         arguments.error("--seconds must be finite and greater than 0")
+    if options.replace_bone_config and not (
+        options.prepare_bone_config or options.bone_config_file
+    ):
+        arguments.error("--replace-bone-config requires a preparation option")
     side = Side(options.side)
+    if options.prepare_bone_config or options.bone_config_file:
+        from qnbot_sdk.glove import (
+            BoneConfigOverwritePolicy,
+            import_bone_config,
+            prepare_bone_config_terminal,
+        )
+
+        overwrite = (
+            BoneConfigOverwritePolicy.REPLACE_EXISTING
+            if options.replace_bone_config
+            else BoneConfigOverwritePolicy.DENY
+        )
+        if options.bone_config_file:
+            installed = import_bone_config(
+                options.bone_config_file,
+                side=side,
+                operator_id=options.operator_id,
+                overwrite=overwrite,
+            )
+        else:
+            installed = prepare_bone_config_terminal(
+                side=side, operator_id=options.operator_id, overwrite=overwrite
+            )
+        print(f"bone configuration installed: {installed.path}", flush=True)
+        if not installed.cleanup_confirmed:
+            print("configuration saved; session cleanup not confirmed", flush=True)
     usage = {"auto": "auto", "true": True, "false": False}[options.use_bone_config]
     sdk = Sdk(
         devices=(

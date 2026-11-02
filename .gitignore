@@ -31,3 +31,7 @@ examples/composite-exo-glove/python/captures/
 .DS_Store
 .idea/
 .vscode/
+
+.gradle/
+**/build/
+local.properties

@@ -1,10 +1,9 @@
 # QnBot SDK Glove 示例
 
-本目录提供手套组件（Glove）的 Python 与 C++ 客户示例，覆盖设备发现、手套姿态、有线
+本目录提供手套组件（Glove）的 Python、C++ 与 Android Java 客户示例，覆盖设备发现、手套姿态、有线
 IMU 原始数据、目标手输出、运行模式、触觉反馈以及采集与标定。
-`wireless_receiver_pose` 自动发现一个 USB Receiver 并读取左右手姿态，无需目标手算法包；
-`wireless_receiver_retargeting` 使用已安装的算法包读取左右目标手结果；
-`wireless_receiver_skeleton` 读取左右手骨骼关节结果。运行命令见对应语言说明。
+`device_lifecycle` 展示两只手套独立启停，支持共用同一 Receiver。运行命令见对应语言说明。
+`device_info` 读取手套信息及连接类型，有线和无线共用。
 其中 `time_sync` 示例演示使用外部时间源提供的 Unix 毫秒时间同步 Glove 时间域，并在后台每隔一段时间重新同步。传给 `sync_time` 的 `reference_time_ms` 单位是毫秒，不是纳秒。
 
 `device_selection` 提供无需手套和算法包的设备选择演示；需要 Glove 1.5.0-rc.6
@@ -56,3 +55,7 @@ qnbot algorithm list
 ## 支持
 
 仍无法解决时，请保留运行命令和完整错误信息并联系 QnBot 对接人员。
+
+## Android Java
+
+使用 [Java 示例说明](java/README.md) 获取配套包、调用本组件源码。

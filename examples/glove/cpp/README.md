@@ -90,12 +90,10 @@ cmake --build build-selection --config Release --target device_selection
 | --- | --- | --- | --- | --- |
 | `device_selection` | C++17 | 否 | 否 | 按名称和左右手选择三台外部输入设备，观察歧义提示 |
 | `discover_gloves` | C++17 | 是 | 否 | 查看当前可用手套 |
+| `device_info` | C++17 | 是 | 否 | 读取手套设备信息和连接类型 |
 | `external_input_run_background` | C++17 | 否 | 是 | 由应用提供手套帧，SDK 在后台运行 |
 | `external_input_manual_update` | C++17 | 否 | 是 | 由应用提供手套帧，并由应用手动更新 |
 | `skeleton` | C++17 | 是 | 否 | 读取手部骨骼数据 |
-| `wireless_receiver_pose` | C++17 | 是，一个 Receiver 和左右两只无线手套 | 否 | 读取无线手套姿态 |
-| `wireless_receiver_skeleton` | C++17 | 是，一个 Receiver 和左右两只无线手套 | 否 | 读取无线手套骨骼关节结果 |
-| `wireless_receiver_retargeting` | C++17 | 是，一个 Receiver 和左右两只无线手套 | 是 | 读取无线手套的目标手结果 |
 | `subscription_config` | C++17 | 是 | 否 | 选择最新值或有界 FIFO，并限制订阅交付频率 |
 | `algorithm_configuration` | C++17 | 是 | 是 | 使用已有骨长配置和算法参数覆盖文件 |
 | `quick_start` | C++17 | 是 | 否 | 零参数读取单只手套姿态 |
@@ -107,9 +105,9 @@ cmake --build build-selection --config Release --target device_selection
 | `async_runtime` | C++20 | 是 | 是 | 使用 coroutine 异步读取输出 |
 | `debug_trace` | C++17 | 是 | 是 | 生成诊断日志 |
 | `multiple_outputs` | C++17 | 是 | 是 | 从一只手套读取多路目标输出 |
-| `device_lifecycle` | C++17 | 是，两只 | 是 | 分别管理左右手设备 |
+| `device_lifecycle` | C++17 | 是，两只 | 否 | 多只手套的独立启停：停止、重启其中一只，其他手套继续输出 |
 | `haptics` | C++17 | 是 | 否 | 设置并清除触觉反馈 |
-| `host_capture_calibration` | C++17 | 是，两只 | 是 | 完成左右手采集并保存、应用标定结果 |
+| `host_capture_calibration` | C++17 | 是，两只 | 否，可选目标包 | 完成左右手采集并保存、应用标定结果 |
 
 两个 external input 示例都需要显式提供 `--package-id`，默认由 SDK 在可交互终端提示并接收采集确认（`auto_terminal`）。
 后台示例启动后会返回并继续推帧，**返回不代表标定完成**；按终端提示完成动作期间也要持续提供帧，
@@ -128,7 +126,7 @@ cmake --build build-selection --config Release --target device_selection
 ## 标定策略
 
 普通示例（`quick_start`、`foreground_runtime`、`background_runtime`、`async_runtime`、
-`manual_runtime` 以及 `device_lifecycle`、`multiple_outputs`、`debug_trace`）使用默认的自动标定。
+`manual_runtime` 以及 `multiple_outputs`、`debug_trace`）使用默认的自动标定。
 `glove.start()` 不传参数时，SDK 会在首次推进（`update()`、`run_forever()` 或
 `run_background()`）时自动完成所需的采集与标定，并在需要用户操作时给出终端提示；这些
 示例不调用 `start_capture` 或 `start_calibration`。`manual_runtime` 里的“手动”只表示由应用
@@ -169,13 +167,21 @@ cmake --build build-selection --config Release --target device_selection
 ./build/async_runtime --port /dev/ttyUSB0 --side left --package-id <package-id> --samples 10
 ./build/debug_trace --port /dev/ttyUSB0 --side left --package-id <package-id> --detail full --sample-rate 10
 ./build/multiple_outputs --port /dev/ttyUSB0 --side left --package-id <package-id>
-./build/device_lifecycle --left-port /dev/ttyUSB0 --right-port /dev/ttyUSB1 --package-id <package-id> --updates 10
+./build/device_lifecycle --left-port /dev/ttyUSB0 --right-port /dev/ttyUSB1 --updates 10
 ./build/haptics --port /dev/ttyUSB0 --side left --hold 1
 ./build/host_capture_calibration --package-id <package-id>
 ```
 
+`async_runtime` 持续打印收到的目标关节输出；完成指定样本后停止并释放资源。后台运行提前失败时，示例输出错误并退出，不再等待下一条数据；暂时没有数据时仍继续等待。读取或处理输出失败时也会完成清理。
+
 `time_sync` 使用后台运行模式，每隔 1 秒重新获取一次外部时间源的 Unix 毫秒时间戳并调用
 `glove.sync_time(reference_time_ms)`。传入参数的单位是毫秒，不是纳秒；按 `Ctrl+C` 停止。
+
+`host_capture_calibration` 不传包参数时使用内置骨骼，无需另外安装算法包：
+
+```bash
+./build/host_capture_calibration
+```
 
 `host_capture_calibration` 可同时接收多个包，完成左右手采集后选择一个已配置 target，保存并
 应用标定结果：
@@ -201,7 +207,7 @@ cmake --build build-selection --config Release --target device_selection
 
 - `--port`：手套串口；使用 `--port` 的参数化示例必须显式提供串口。
 - `--side`：手套物理侧，取值为 `left` 或 `right`。
-- `--package-id`：已经安装的目标手算法包 ID；该参数不会安装算法包。
+- `--package-id`：已经安装的目标手算法包 ID；该参数不会安装算法包。`host_capture_calibration` 不传此参数时使用内置骨骼，其他需要目标包的示例仍须显式提供。
 - `--capture-interaction`：两个外部输入示例的交互方式，默认 `auto_terminal`；自带界面或无交互终端时选择 `external`。
 - `--force`：`host_capture_calibration` 忽略可复用采集并重新采集。
 - `--detail`、`--sample-rate`：控制 `debug_trace` 的诊断日志详细程度和采样率。
@@ -210,8 +216,11 @@ cmake --build build-selection --config Release --target device_selection
 
 缺少标定时按终端提示操作，完成后示例会开始输出目标关节结果。
 
-动作、顺序和采样数以当前采集计划为准，不同目标的动作可能不同。默认复用已有兼容采集，
-只提示仍需采集的动作；使用 `--force` 时重新采集。`host_capture_calibration` 示例逐个确认计划中的动作。
+以下八手势池流程适用于包含该更新的 SDK。当前安装示例指定的 1.5.0 不包含此更新，其动作仍由算法包声明；首个包含八手势池的发布版本尚未确定。
+
+首次按提示完成八个动作，每个动作保持到采满 30 帧：五指自然并拢、五指自然张开、四指根关节弯曲约 90 度、自然握拳，以及拇指分别与食指、中指、无名指、小指指腹轻触。八步全部完成后保存采集。
+
+同一操作者、手套和手侧下，再次运行或切换目标包会复用兼容采集，不重复摆已采动作；新目标仍会计算自己的标定结果。使用 `--force` 才重新采集全部八步。升级前保存的采集若不兼容，程序会重新请求这八步；完成一次后恢复正常复用。`host_capture_calibration` 示例逐个确认计划中的动作。
 
 完整复用当前采集数据时，已有的兼容标定结果保持不变。包含取消结果修复的 SDK 在标定会话被取消后丢弃本次新结果，保留上一份兼容的有效标定；没有旧结果时，下次运行仍需完成标定。首个包含该修复的发布版本尚未确定，Core/Glove 1.5.0 仍可能保留已取消会话的新结果。
 使用 `--force` 成功完成新采集后，需要基于新数据完成标定才能恢复目标输出。
@@ -253,7 +262,7 @@ cmake --build build-selection --config Release --target device_selection
 
 `algorithm_configuration` 将已有骨长配置的使用策略与算法参数覆盖文件放在同一示例中。
 先通过 QnBot CLI 安装产品交付的兼容算法包；准备骨长配置及覆盖文件时遵循该算法包的产品说明。
-该示例使用配置，不生成骨长配置，也不执行骨长标定。
+该示例默认使用已有配置，也可显式选择扫码准备或导入网页下载的单手配置；准备成功后再创建 SDK。新增准备选项需要包含 `BoneConfigSession` 接口的配套 SDK 安装包。
 
 ```bash
 ./build/algorithm_configuration --port /dev/ttyUSB0 --side left --package-id '<package-id>' --use-bone-config false
@@ -262,9 +271,24 @@ cmake --build build-selection --config Release --target device_selection
 
 - `--use-bone-config auto`：默认值，存在对应操作者、手侧的骨长配置时使用，否则采用算法默认值。
 - `--use-bone-config true`：要求对应配置存在且有效；`false` 忽略该配置。
-- `--operator-id`：骨长配置对应的操作者，默认 `default`；无需传入骨长文件路径。
+- `--operator-id`：骨长配置对应的操作者，默认 `default`；无需指定配置安装目录。
 - `--algorithm-config-path`：可选的算法参数覆盖文件，相对路径从程序启动目录解析；字段按算法包说明填写。省略时使用算法默认参数。
 - `--seconds`：启动及所需自动标定完成后的读取秒数，默认 `10`。
+
+
+需要先测量时，按 [标定网页](https://calibrator.qnbot.com) 的要求准备 A4 标定板，在原命令中增加 `--prepare-bone-config`：
+
+```sh
+./build/algorithm_configuration --port /dev/ttyUSB0 --side left --package-id '<package-id>' --operator-id default --use-bone-config true --prepare-bone-config
+```
+
+程序显示二维码或链接；手机完成指定手侧测量后，电脑输出安装路径并继续运行。会话有效期为 15 分钟，到期后重新运行命令。也可以在网页下载“上位机配置 YAML”并导入：
+
+```sh
+./build/algorithm_configuration --port /dev/ttyUSB0 --side left --package-id '<package-id>' --operator-id default --use-bone-config true --bone-config-file /path/to/left.yaml
+```
+
+`--prepare-bone-config` 与 `--bone-config-file` 二选一；“详细 YAML”不能作为配置导入。已有配置默认保留，确认要替换时增加 `--replace-bone-config`。准备失败时程序不会继续创建 SDK。取消时按终端提示操作；若已经显示配置安装成功，清理未确认不影响已保存的配置。
 
 缺少动作采集时按终端提示操作，完成后输出目标关节数据。骨长配置不等同于该动作采集与标定流程。
 配置文件修改后重新运行示例；是否需要重新标定以算法包说明为准。要求使用配置却找不到文件时，先确认操作者及手侧与准备的配置一致。
@@ -287,41 +311,27 @@ cmake --build build-selection --config Release --target device_selection
 
 仍无法解决时，请保留构建命令、运行命令和完整错误信息并联系 QnBot 对接人员。
 
-## 无线 Receiver
+## 有线和无线共用示例
 
-将一个 USB Receiver 接入电脑，打开左右两只无线手套，并确保它们已连接到该 Receiver。
-左右两只手套都必须在线。读取姿态无需目标手算法包：
+以下示例使用同一套配置，支持 USB 直连、Receiver 无线连接以及左右手混合连接。
+连接 Receiver 时，打开本次使用的手套。只读取一只手时，无需另一只手在线。
 
-```bash
-./build/wireless_receiver_pose
-```
-
-读取目标手结果时，先按准备工作安装对应算法包，再运行：
+查看可用设备及连接类型：
 
 ```bash
-./build/wireless_receiver_retargeting --package-id <package-id>
+./build/discover_gloves
 ```
 
-读取左右手骨骼关节结果，无需另行指定目标手算法包：
+读取指定手套的设备信息（无需算法包或启动数据流）：
 
 ```bash
-./build/wireless_receiver_skeleton
+./build/device_info --side left
+./build/device_info --side right
+./build/device_info --port <port> --side left
 ```
 
-三个示例均自动发现唯一的 Receiver。`wireless_receiver_pose` 持续打印左右手姿态；
-`wireless_receiver_retargeting` 在完成必要的标定后持续打印左右目标手关节结果。
-`wireless_receiver_skeleton` 持续打印左右手骨骼关节结果。
-缺少标定时按终端提示操作；按 `Ctrl+C` 停止。
-如果连接了多个 Receiver，请只保留本次测试使用的一个；若提示手套离线，打开对应手套后重新运行。
+只连接一只手套时可省略参数；有多个同侧手套时用 `--port` 明确串口。
+输出 SN、手别、型号、固件及 `transport_type`。有线为 `serial`，无线手套为 `receiver_peer`；
+设备未提供的字段显示 `unknown`。
 
-`GloveReceiverConfig` 包含左右两个 `GloveConfig`，只填写手侧，无需配置名称或连接参数。
-
-## 发现无线手套
-
-连接 Receiver 并给无线手套供电后运行：
-
-```bash
-./build/wireless_receiver_discovery
-```
-
-打印无线发现记录数量、连接类型、串口、左右手、SN 和查询状态；失败记录显示原因。无需目标手算法包，可仅连接一只无线手套。
+`device_lifecycle` 无需算法包，依次展示双手输出、停止右手时左手继续输出、重启右手后恢复输出。省略串口参数时自动发现；两只手套使用同一 Receiver 时，`--left-port` 和 `--right-port` 可以填写同一串口。
