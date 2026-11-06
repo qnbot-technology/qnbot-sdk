@@ -14,7 +14,8 @@ int main(int argc, char** argv) {
         const auto subscription = device.imu().subscribe(
             [](const qnbot::Sample<qnbot::GloveImu>& sample) {
                 const auto& value = sample.value.payload;
-                std::cout << "imu sequence=" << sample.sequence
+                std::cout << "imu source=" << sample.value.meta.source
+                          << " sequence=" << sample.sequence
                           << " valid=" << value.valid << " gyroscope_raw=["
                           << value.gyroscope_raw[0] << ", "
                           << value.gyroscope_raw[1] << ", "

@@ -1,8 +1,9 @@
 package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
+import com.qnbot.sdk.SleepResult;
 import com.qnbot.sdk.android.SerialTransport;
 import com.qnbot.sdk.config.CompositeExoGloveConfig;
 import com.qnbot.sdk.config.SerialConnection;
@@ -14,23 +15,31 @@ import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 import com.qnbot.sdk.glove.GloveFinger;
+import java.util.function.BooleanSupplier;
 
-/** Telemetry: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Reads combined telemetry from one composite Exo+Glove link: both glove poses, both glove status
+ * streams, Exo telemetry and Exo status. Callers supply the authorized transport, the shared port
+ * and a stop flag; the root Sdk drives all three members while updates run on their worker.
+ */
 public final class Telemetry {
   private Telemetry() {}
 
-  public static void run(Context context, SerialTransport transport, String port) throws Exception {
+  public static void run(Context context, SerialTransport transport, String port,
+      BooleanSupplier cancelled) throws InterruptedException {
+    if (cancelled.getAsBoolean())
+      return;
     SdkConfig config = SdkConfig.builder()
-                           .device(CompositeExoGloveConfig.builder()
-                                       .connection(SerialConnection.port(port))
-                                       .devices(GloveConfig.builder().side(Side.LEFT).build(),
-                                           GloveConfig.builder().side(Side.RIGHT).build(),
-                                           ExoConfig.builder().build())
-                                       .build())
-                           .build();
-    try (GloveSdk sdk = new GloveSdk(config, context, transport)) {
+        .device(CompositeExoGloveConfig.builder()
+            .connection(SerialConnection.port(port))
+            .devices(GloveConfig.builder().side(Side.LEFT).build(),
+                GloveConfig.builder().side(Side.RIGHT).build(), ExoConfig.builder().build())
+            .build())
+        .build();
+    try (Sdk sdk = new Sdk(config, context, transport)) {
+      // One root Sdk exposes both member domains for the same composite link.
       Glove glove = sdk.glove();
-      Exo exo = new Exo(sdk);
+      Exo exo = sdk.exo();
       GloveDevice left = glove.device(Side.LEFT);
       GloveDevice right = glove.device(Side.RIGHT);
       ExoDevice exoDevice = exo.device();
@@ -57,8 +66,16 @@ public final class Telemetry {
       exoDevice.status().subscribe(sample
           -> System.out.println(
               "exo connected=" + sample.value.connected + " stale=" + sample.value.stale));
+      // Start after subscribing, then drive every scheduled task on the caller's worker.
       sdk.start();
-      sdk.runForever();
+      while (!cancelled.getAsBoolean()) {
+        var update = sdk.update();
+        if (!update.hasNextTask) {
+          Thread.sleep(20);
+        } else if (update.sleep() == SleepResult.STOPPED) {
+          break;
+        }
+      }
     }
   }
 }

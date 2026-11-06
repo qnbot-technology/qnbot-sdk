@@ -9,15 +9,17 @@ from qnbot_sdk.glove import GloveConfig, GloveImu
 def print_imu(sample: Sample[GloveImu]) -> None:
     imu = sample.value.payload
     print(
-        f"imu sequence={sample.sequence} valid={imu.valid} "
+        f"imu source={sample.value.meta.source} sequence={sample.sequence} valid={imu.valid} "
         f"gyroscope_raw={imu.gyroscope_raw} "
         f"accelerometer_raw={imu.accelerometer_raw}"
     )
 
 
 def main() -> None:
-    arguments = argparse.ArgumentParser(description="Read wired glove IMU raw counts")
-    arguments.add_argument("--port", required=True, help="Serial port for the glove")
+    arguments = argparse.ArgumentParser(description="Read glove IMU raw counts")
+    arguments.add_argument(
+        "--port", required=True, help="Serial port for the glove or wireless Receiver"
+    )
     arguments.add_argument(
         "--side",
         choices=(Side.LEFT.value, Side.RIGHT.value),

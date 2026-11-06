@@ -16,6 +16,10 @@
 Java 用户同样先选择组件，再阅读 [Glove Java](examples/glove/java/README.md)、[Exo Java](examples/exo/java/README.md) 或 [组合 Java](examples/composite-exo-glove/java/README.md)。在自己的 Android 项目中调用对应源码。
 
 
+## 未发布示例
+
+[厂商手套协议示例](examples/vendor-glove/README.md) 使用本 PR 匹配的 Core/native 构建，首个发布版本未定。Python/C++ 均提供显式串口查询与原始数据读取流程。
+
 ## 仓库内容
 
 ```text
