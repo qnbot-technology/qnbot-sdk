@@ -1,7 +1,7 @@
 package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
 import com.qnbot.sdk.config.Side;
 import com.qnbot.sdk.error.AmbiguousSelectionException;
@@ -9,7 +9,12 @@ import com.qnbot.sdk.glove.ExternalConnection;
 import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 
-/** DeviceSelection: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Resolves gloves by name and side, then shows the ambiguity errors for unqualified selectors.
+ *
+ * <p>No Android transport is needed: the devices use external connections. Supply the Android
+ * Context; the SDK closes after the three selections and two expected ambiguity checks.
+ */
 public final class DeviceSelection {
   private DeviceSelection() {}
 
@@ -31,20 +36,20 @@ public final class DeviceSelection {
                                        .connection(ExternalConnection.INSTANCE)
                                        .build())
                            .build();
-    try (GloveSdk sdk = new GloveSdk(config, context); Glove glove = sdk.glove()) {
+    try (Sdk sdk = new Sdk(config, context); Glove glove = sdk.glove()) {
       System.out.println("primary left source_id=" + glove.device("primary", Side.LEFT).sourceId());
       System.out.println(
           "primary right source_id=" + glove.device("primary", Side.RIGHT).sourceId());
       System.out.println("backup left source_id=" + glove.device("backup").sourceId());
       try {
         glove.device("primary");
-        throw new IllegalStateException("primary 应产生歧义");
+        throw new IllegalStateException("name=primary should match two devices");
       } catch (AmbiguousSelectionException expected) {
         System.out.println("expected ambiguity: name=primary");
       }
       try {
         glove.device(Side.LEFT);
-        throw new IllegalStateException("left 应产生歧义");
+        throw new IllegalStateException("side=left should match two devices");
       } catch (AmbiguousSelectionException expected) {
         System.out.println("expected ambiguity: side=left");
       }

@@ -1,89 +1,99 @@
 package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
 import com.qnbot.sdk.SleepResult;
 import com.qnbot.sdk.android.SerialTransport;
+import com.qnbot.sdk.channel.ReadChannel;
 import com.qnbot.sdk.channel.Sample;
 import com.qnbot.sdk.config.SerialConnection;
 import com.qnbot.sdk.config.Side;
-import com.qnbot.sdk.error.AmbiguousSelectionException;
 import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 import com.qnbot.sdk.glove.GlovePose;
 import java.util.Optional;
 
-/** DeviceLifecycle: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Stops and restarts the right glove while the left keeps streaming pose samples.
+ *
+ * <p>Supply the Android Context, authorized transport, optional serial ports and the number of
+ * fresh samples per phase. The example checks that a stopped device stops advancing.
+ */
 public final class DeviceLifecycle {
   private DeviceLifecycle() {}
 
   public static void run(Context context, SerialTransport transport, String leftPort,
-      String rightPort) throws Exception {
+      String rightPort, int updates) throws InterruptedException {
+    if (updates <= 0) {
+      throw new IllegalArgumentException("updates must be positive");
+    }
     SdkConfig config = SdkConfig.builder()
                            .device(GloveConfig.builder()
                                        .name("left")
                                        .side(Side.LEFT)
-                                       .connection(SerialConnection.port(leftPort))
+                                       .connection(leftPort == null
+                                               ? SerialConnection.autoDiscover()
+                                               : SerialConnection.port(leftPort))
                                        .build())
                            .device(GloveConfig.builder()
                                        .name("right")
                                        .side(Side.RIGHT)
-                                       .connection(SerialConnection.port(rightPort))
+                                       .connection(rightPort == null
+                                               ? SerialConnection.autoDiscover()
+                                               : SerialConnection.port(rightPort))
                                        .build())
                            .build();
-    try (GloveSdk sdk = new GloveSdk(config, context, transport); Glove glove = sdk.glove()) {
-      try {
-        glove.device();
-        throw new IllegalStateException("未限定双手选择应产生歧义");
-      } catch (AmbiguousSelectionException expected) {
-        System.out.println("预期歧义：同时配置双手；使用名称或左右手选择");
-      }
-      System.out.println("left selected=" + glove.device("left", Side.LEFT).sourceId());
-      System.out.println("right selected=" + glove.device(Side.RIGHT).sourceId());
+    try (Sdk sdk = new Sdk(config, context, transport); Glove glove = sdk.glove()) {
       GloveDevice left = glove.device("left");
       GloveDevice right = glove.device("right");
+      ReadChannel<GlovePose> leftPose = left.pose();
+      ReadChannel<GlovePose> rightPose = right.pose();
       left.start();
       right.start();
+      System.out.println("both devices active");
       for (int phase = 0; phase < 3; phase++) {
         boolean rightActive = phase != 1;
         if (phase == 1) {
           right.stop();
-          System.out.println("右手已停止；检查左手继续产生新帧");
+          System.out.println("right device stopped; left remains active");
         } else if (phase == 2) {
           right.start();
-          System.out.println("右手重新启动");
+          System.out.println("right device restarted");
         }
-        long previousLeft = left.pose().latest().map(sample -> sample.sequence).orElse(-1L);
-        long previousRight = right.pose().latest().map(sample -> sample.sequence).orElse(-1L);
-        int leftCount = 0, rightCount = 0;
+        long previousLeft = leftPose.latest().map(sample -> sample.sequence).orElse(-1L);
+        long previousRight = rightPose.latest().map(sample -> sample.sequence).orElse(-1L);
+        int leftCount = 0;
+        int rightCount = 0;
         long deadline = System.nanoTime() + 10_000_000_000L;
-        while ((leftCount < 10 || (rightActive && rightCount < 10))) {
-          if (System.nanoTime() >= deadline)
-            throw new IllegalStateException("等待双手新帧超时");
-          if (glove.update().sleep() == SleepResult.STOPPED)
-            return;
-          Optional<Sample<GlovePose>> l = left.pose().latest();
-          Optional<Sample<GlovePose>> r = right.pose().latest();
-          long rightSequence = r.map(sample -> sample.sequence).orElse(-1L);
+        while (leftCount < updates || (rightActive && rightCount < updates)) {
+          if (System.nanoTime() >= deadline) {
+            throw new IllegalStateException("timed out waiting for pose samples");
+          }
+          var update = glove.update();
+          if (update.sleep() == SleepResult.NO_TASKS) {
+            Thread.sleep(10);
+          }
+          Optional<Sample<GlovePose>> leftSample = leftPose.latest();
+          Optional<Sample<GlovePose>> rightSample = rightPose.latest();
+          long rightSequence = rightSample.map(sample -> sample.sequence).orElse(-1L);
           if (!rightActive && rightSequence != previousRight) {
-            throw new IllegalStateException("右手停止后仍产生新姿态帧");
+            throw new IllegalStateException("right pose advanced while stopped");
           }
-          if (l.isPresent() && l.get().sequence != previousLeft) {
-            previousLeft = l.get().sequence;
+          if (leftSample.isPresent() && leftSample.get().sequence != previousLeft) {
+            previousLeft = leftSample.get().sequence;
             leftCount++;
-            System.out.println("left sequence=" + l.get().sequence);
+            System.out.println("left pose sequence=" + leftSample.get().sequence);
           }
-          if (rightActive && r.isPresent() && rightSequence != previousRight) {
+          if (rightActive && rightSample.isPresent() && rightSequence != previousRight) {
             previousRight = rightSequence;
             rightCount++;
-            System.out.println("right sequence=" + r.get().sequence);
+            System.out.println("right pose sequence=" + rightSample.get().sequence);
           }
-          Thread.sleep(10);
         }
       }
-      System.out.println("双设备独立启停完成");
+      System.out.println("lifecycle complete");
     }
   }
 }

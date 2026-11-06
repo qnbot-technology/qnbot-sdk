@@ -182,9 +182,37 @@ qnbot::CaptureSession capture_side(qnbot::GloveDevice& device,
             if (plan_stage != snapshot.plan.stages.end()) {
                 prompt = plan_stage->prompt_en.value_or(plan_stage->prompt);
             }
-            std::cout << prompt << " [Y/n]: ";
+            for (const auto& stage : snapshot.stage_progress) {
+                const char* state =
+                    stage.state == qnbot::CaptureStageState::completed
+                        ? "completed"
+                    : stage.state == qnbot::CaptureStageState::skipped
+                        ? "skipped"
+                    : snapshot.current_stage &&
+                            stage.stage_id == *snapshot.current_stage
+                        ? "current"
+                        : "pending";
+                std::cout << "  " << stage.stage_id << ": " << state << '\n';
+            }
+            std::cout << prompt << " [Enter / stage <id> / n]: ";
             std::string answer;
             std::getline(std::cin, answer);
+            if (answer.rfind("stage ", 0) == 0) {
+                const auto stage_id = answer.substr(6);
+                const auto selected = std::find_if(
+                    snapshot.plan.stages.begin(), snapshot.plan.stages.end(),
+                    [&](const qnbot::CapturePlanStage& stage) {
+                        return stage.stage_id == stage_id;
+                    });
+                if ((snapshot.current_stage &&
+                     stage_id == *snapshot.current_stage) ||
+                    selected == snapshot.plan.stages.end()) {
+                    std::cout << "choose a different listed stage\n";
+                    continue;
+                }
+                session.retry(stage_id);
+                continue;
+            }
             if (answer.empty() || answer == "confirm" || answer == "y" ||
                 answer == "yes") {
                 session.confirm(*snapshot.request_id);

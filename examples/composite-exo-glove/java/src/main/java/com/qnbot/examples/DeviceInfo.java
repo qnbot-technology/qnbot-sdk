@@ -1,7 +1,7 @@
 package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
 import com.qnbot.sdk.android.SerialTransport;
 import com.qnbot.sdk.config.CompositeExoGloveConfig;
@@ -15,22 +15,26 @@ import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 
-/** DeviceInfo: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Shows the members of one composite Exo+Glove device: the two glove source IDs plus the Exo
+ * product, firmware, protocol and capability details. Callers supply an authorized transport and
+ * the shared port; the single Sdk is closed after the read.
+ */
 public final class DeviceInfo {
   private DeviceInfo() {}
 
-  public static void run(Context context, SerialTransport transport, String port) throws Exception {
+  public static void run(Context context, SerialTransport transport, String port) {
     SdkConfig config = SdkConfig.builder()
-                           .device(CompositeExoGloveConfig.builder()
-                                       .connection(SerialConnection.port(port))
-                                       .devices(GloveConfig.builder().side(Side.LEFT).build(),
-                                           GloveConfig.builder().side(Side.RIGHT).build(),
-                                           ExoConfig.builder().build())
-                                       .build())
-                           .build();
-    try (GloveSdk sdk = new GloveSdk(config, context, transport)) {
+        .device(CompositeExoGloveConfig.builder()
+            .connection(SerialConnection.port(port))
+            .devices(GloveConfig.builder().side(Side.LEFT).build(),
+                GloveConfig.builder().side(Side.RIGHT).build(), ExoConfig.builder().build())
+            .build())
+        .build();
+    try (Sdk sdk = new Sdk(config, context, transport)) {
+      // One root Sdk exposes both member domains for the shared link.
       Glove glove = sdk.glove();
-      Exo exo = new Exo(sdk);
+      Exo exo = sdk.exo();
       GloveDevice left = glove.device(Side.LEFT);
       GloveDevice right = glove.device(Side.RIGHT);
       ExoDevice exoDevice = exo.device();
