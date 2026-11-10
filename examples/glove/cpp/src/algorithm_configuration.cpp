@@ -117,21 +117,15 @@ int main(int argc, char** argv) {
         auto device = glove.device();
         const auto subscription =
             device.output("configured_hand").subscribe(example::print_output);
-        try {
-            glove.start();
-            glove.run_background();
-            std::cout << "package=" << package_id
-                      << " use_bone_config=" << bone_option
-                      << " algorithm_config_path="
-                      << algorithm_config_path.value_or("(default)")
-                      << std::endl;
-            std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
-            glove.request_stop();
-            glove.join();
-        } catch (...) {
-            glove.close();
-            throw;
-        }
+        glove.start();
+        glove.run_background();
+        std::cout << "package=" << package_id
+                  << " use_bone_config=" << bone_option
+                  << " algorithm_config_path="
+                  << algorithm_config_path.value_or("(default)") << std::endl;
+        std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
+        glove.request_stop();
+        glove.join();
         static_cast<void>(subscription);
         glove.close();
         std::cout << "algorithm configuration complete\n";

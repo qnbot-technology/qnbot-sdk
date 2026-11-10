@@ -34,27 +34,30 @@ def main() -> None:
         )
     )
     exo = sdk.exo()
-    first = exo.device("first")
-    second = exo.device("second")
-    first.start()
-    second.start()
-    print_health("first", first.health())
-    print_health("second", second.health())
-    time.sleep(options.seconds)
+    try:
+        first = exo.device("first")
+        second = exo.device("second")
+        first.start()
+        second.start()
+        print_health("first", first.health())
+        print_health("second", second.health())
+        time.sleep(options.seconds)
 
-    second.stop()
-    print("second device stopped; first remains active")
-    print_health("first", first.health())
-    latest = first.telemetry().latest()
-    if latest is not None:
-        print(
-            f"first telemetry sequence={latest.sequence} "
-            f"left_arm={latest.value.payload.left_arm.encoder_counts}"
-        )
+        second.stop()
+        print("second device stopped; first remains active")
+        print_health("first", first.health())
+        latest = first.telemetry().latest()
+        if latest is not None:
+            print(
+                f"first telemetry sequence={latest.sequence} "
+                f"left_arm={latest.value.payload.left_arm.encoder_counts}"
+            )
 
-    first.stop()
-    first.close()
-    second.close()
+        first.stop()
+        first.close()
+        second.close()
+    finally:
+        exo.close()
 
 
 if __name__ == "__main__":

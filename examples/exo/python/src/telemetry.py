@@ -39,7 +39,10 @@ def main() -> None:
 
     exo.start()
     print("running; press Ctrl+C to stop")
-    exo.run_forever()
+    try:
+        exo.run_forever()
+    finally:
+        exo.close()
 
 
 if __name__ == "__main__":

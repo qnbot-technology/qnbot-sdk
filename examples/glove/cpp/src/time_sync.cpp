@@ -4,8 +4,9 @@
 #include <csignal>
 #include <cstdlib>
 #include <exception>
-#include <iostream>
 #include <iomanip>
+#include <iostream>
+#include <optional>
 #include <thread>
 #include <utility>
 
@@ -15,15 +16,12 @@ volatile std::sig_atomic_t stop_requested = 0;
 
 void handle_sigint(int) { stop_requested = 1; }
 
-const char* finger_name(qnbot::GloveFinger finger) {
-    switch (finger) {
-    case qnbot::GloveFinger::thumb: return "thumb";
-    case qnbot::GloveFinger::index: return "index";
-    case qnbot::GloveFinger::middle: return "middle";
-    case qnbot::GloveFinger::ring: return "ring";
-    case qnbot::GloveFinger::pinky: return "pinky";
-    }
-    return "unknown";
+void print_source_time(const std::optional<double>& source_time) {
+    std::cout << "source_time_ms=";
+    if (source_time)
+        std::cout << *source_time;
+    else
+        std::cout << "none";
 }
 
 double external_reference_time_ms() {
@@ -51,38 +49,25 @@ int main() {
         auto device = glove.device();
         const auto subscription = device.pose().subscribe(
             [](const qnbot::Sample<qnbot::GlovePose>& sample) {
-                std::cout << "pose sequence=" << sample.sequence
-                          << " source_time_ms=";
-                if (sample.source_time)
-                    std::cout << *sample.source_time;
-                else
-                    std::cout << "none";
+                const auto& fingertips = sample.value.payload.fingertip_local;
+                const auto& index = fingertips.at(qnbot::GloveFinger::index);
+                std::cout << "pose sequence=" << sample.sequence << ' ';
+                print_source_time(sample.source_time);
                 std::cout << " observed_at_ms=" << sample.observed_at
-                          << " fingertips={";
-                bool first = true;
-                for (const auto& [finger, node] :
-                     sample.value.payload.fingertip_local) {
-                    if (!first) std::cout << ", ";
-                    const auto& position = node.position;
-                    const auto& quaternion = node.quaternion_xyzw;
-                    std::cout << finger_name(finger)
-                              << "=GloveNodePose(position=(" << position[0]
-                              << ", " << position[1] << ", " << position[2]
-                              << "), quaternion_xyzw=(" << quaternion[0] << ", "
-                              << quaternion[1] << ", " << quaternion[2] << ", "
-                              << quaternion[3] << "))";
-                    first = false;
-                }
-                std::cout << "}\n";
+                          << " fingertips=" << fingertips.size()
+                          << " index_position=(" << index.position[0] << ", "
+                          << index.position[1] << ", " << index.position[2]
+                          << ") index_quaternion_xyzw=("
+                          << index.quaternion_xyzw[0] << ", "
+                          << index.quaternion_xyzw[1] << ", "
+                          << index.quaternion_xyzw[2] << ", "
+                          << index.quaternion_xyzw[3] << ")\n";
             });
 
         const auto status_subscription = device.status().subscribe(
             [](const qnbot::Sample<qnbot::GloveStatus>& sample) {
-                std::cout << "status source_time_ms=";
-                if (sample.source_time)
-                    std::cout << *sample.source_time;
-                else
-                    std::cout << "none";
+                std::cout << "status ";
+                print_source_time(sample.source_time);
                 std::cout << " observed_at_ms=" << sample.observed_at
                           << " connected=" << sample.value.connected << '\n';
             });
@@ -94,7 +79,6 @@ int main() {
                   << std::endl;
         while (!stop_requested) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
-            if (stop_requested) break;
             const double updated_reference_time_ms =
                 external_reference_time_ms();
             glove.sync_time(updated_reference_time_ms);

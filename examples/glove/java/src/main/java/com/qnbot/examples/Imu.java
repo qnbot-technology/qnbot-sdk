@@ -1,7 +1,7 @@
-package com.qnbot.examples;
+    package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
 import com.qnbot.sdk.android.SerialTransport;
 import com.qnbot.sdk.config.SerialConnection;
@@ -10,20 +10,25 @@ import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 
-/** Imu: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Streams raw glove IMU counts.
+ *
+ * <p>Pass the host {@link Context}, an authorized transport, the glove port and side. Wired gloves
+ * and compatible wireless receivers publish here; a sample with {@code valid=false} still prints
+ * its raw gyroscope and accelerometer counts.
+ */
 public final class Imu {
   private Imu() {}
 
-  public static void run(Context context, SerialTransport transport, String port, Side side)
-      throws Exception {
+  public static void run(Context context, SerialTransport transport, String port, Side side) {
     SdkConfig config = SdkConfig.builder()
-                           .device(GloveConfig.builder()
-                                       .name("primary")
-                                       .side(side)
-                                       .connection(SerialConnection.port(port))
-                                       .build())
-                           .build();
-    try (GloveSdk sdk = new GloveSdk(config, context, transport); Glove glove = sdk.glove()) {
+        .device(GloveConfig.builder()
+                    .name("primary")
+                    .side(side)
+                    .connection(SerialConnection.port(port))
+                    .build())
+        .build();
+    try (Sdk sdk = new Sdk(config, context, transport); Glove glove = sdk.glove()) {
       GloveDevice device = glove.device();
       device.imu().subscribe(sample
           -> System.out.println("IMU sequence=" + sample.sequence + " valid="

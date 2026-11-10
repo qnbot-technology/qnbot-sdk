@@ -34,16 +34,18 @@ def main() -> None:
         ),
     )
     exo = sdk.exo()
-    device = exo.device()
-    if not device.get_device_info().capabilities.handsets:
-        print("this device reports no handset")
-        exo.close()
-        return
+    try:
+        device = exo.device()
+        if not device.get_device_info().capabilities.handsets:
+            print("this device reports no handset")
+            return
 
-    device.telemetry().subscribe(print_handsets)
-    exo.start()
-    print("running; press Ctrl+C to stop")
-    exo.run_forever()
+        device.telemetry().subscribe(print_handsets)
+        exo.start()
+        print("running; press Ctrl+C to stop")
+        exo.run_forever()
+    finally:
+        exo.close()
 
 
 if __name__ == "__main__":

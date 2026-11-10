@@ -14,7 +14,8 @@ int main(int argc, char** argv) {
         const auto subscription = device.imu().subscribe(
             [](const qnbot::Sample<qnbot::GloveImu>& sample) {
                 const auto& value = sample.value.payload;
-                std::cout << "imu sequence=" << sample.sequence
+                std::cout << "imu source=" << sample.value.meta.source
+                          << " sequence=" << sample.sequence
                           << " valid=" << value.valid << " gyroscope_raw=["
                           << value.gyroscope_raw[0] << ", "
                           << value.gyroscope_raw[1] << ", "
@@ -24,14 +25,9 @@ int main(int argc, char** argv) {
                           << value.accelerometer_raw[2] << "]\n";
             });
 
-        try {
-            glove.start();
-            std::cout << "running; press Ctrl+C to stop" << std::endl;
-            glove.run_forever();
-        } catch (...) {
-            glove.close();
-            throw;
-        }
+        glove.start();
+        std::cout << "running; press Ctrl+C to stop" << std::endl;
+        glove.run_forever();
         static_cast<void>(subscription);
         glove.close();
         return EXIT_SUCCESS;

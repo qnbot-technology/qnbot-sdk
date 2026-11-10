@@ -44,6 +44,7 @@ int main(int argc, char** argv) {
         exo.run_forever();
         static_cast<void>(telemetry_subscription);
         static_cast<void>(status_subscription);
+        exo.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         return example::report_error(error);

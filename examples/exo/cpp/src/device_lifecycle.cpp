@@ -67,6 +67,7 @@ int main(int argc, char** argv) {
         first.stop();
         first.close();
         second.close();
+        exo.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         return example::report_error(error);

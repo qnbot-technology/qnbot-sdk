@@ -38,14 +38,9 @@ int main(int argc, char** argv) {
                               << " joints=" << sample.value.joints.size()
                               << '\n';
                 });
-        try {
-            glove.start();
-            std::cout << "running; press Ctrl+C to stop" << std::endl;
-            glove.run_forever();
-        } catch (...) {
-            glove.close();
-            throw;
-        }
+        glove.start();
+        std::cout << "running; press Ctrl+C to stop" << std::endl;
+        glove.run_forever();
         static_cast<void>(joint_angles_subscription);
         glove.close();
         return EXIT_SUCCESS;

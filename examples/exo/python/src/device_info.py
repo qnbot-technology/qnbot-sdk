@@ -44,9 +44,11 @@ def main() -> None:
         ),
     )
     exo = sdk.exo()
-    device = exo.device()
-    print_info(device.get_device_info())
-    exo.close()
+    try:
+        device = exo.device()
+        print_info(device.get_device_info())
+    finally:
+        exo.close()
 
 
 if __name__ == "__main__":
