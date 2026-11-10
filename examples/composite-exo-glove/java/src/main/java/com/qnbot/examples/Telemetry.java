@@ -1,7 +1,7 @@
 package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
 import com.qnbot.sdk.android.SerialTransport;
 import com.qnbot.sdk.config.CompositeExoGloveConfig;
@@ -15,11 +15,17 @@ import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 import com.qnbot.sdk.glove.GloveFinger;
 
-/** Telemetry: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Reads combined telemetry from one composite Exo+Glove link: both glove poses, both glove status
+ * streams, Exo telemetry and Exo status.
+ *
+ * <p>Callers supply the authorized transport and the shared port. The root Sdk drives all three
+ * members.
+ */
 public final class Telemetry {
   private Telemetry() {}
 
-  public static void run(Context context, SerialTransport transport, String port) throws Exception {
+  public static void run(Context context, SerialTransport transport, String port) {
     SdkConfig config = SdkConfig.builder()
                            .device(CompositeExoGloveConfig.builder()
                                        .connection(SerialConnection.port(port))
@@ -28,9 +34,10 @@ public final class Telemetry {
                                            ExoConfig.builder().build())
                                        .build())
                            .build();
-    try (GloveSdk sdk = new GloveSdk(config, context, transport)) {
+    try (Sdk sdk = new Sdk(config, context, transport)) {
+      // One root Sdk exposes both member domains for the same composite link.
       Glove glove = sdk.glove();
-      Exo exo = new Exo(sdk);
+      Exo exo = sdk.exo();
       GloveDevice left = glove.device(Side.LEFT);
       GloveDevice right = glove.device(Side.RIGHT);
       ExoDevice exoDevice = exo.device();
@@ -57,6 +64,7 @@ public final class Telemetry {
       exoDevice.status().subscribe(sample
           -> System.out.println(
               "exo connected=" + sample.value.connected + " stale=" + sample.value.stale));
+      // Start after subscribing, then let the root runner drive every scheduled task.
       sdk.start();
       sdk.runForever();
     }

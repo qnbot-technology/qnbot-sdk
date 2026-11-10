@@ -4,7 +4,7 @@
 #include "example_support.hpp"
 
 #include <cstdlib>
-#include <chrono>
+#include <exception>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -81,57 +81,41 @@ int main(int argc, char** argv) {
         auto output = device.output(example::default_target_name);
         auto executor = std::make_shared<example::QueueExecutor>();
 
-        std::stop_source pending_stop;
-        std::exception_ptr failure;
-        std::exception_ptr runner_failure;
-        std::thread observer;
-        bool background_started = false;
         try {
             glove.start();
             glove.run_background();
-            background_started = true;
-            observer = std::thread([&] {
-                try {
-                    glove.join();
-                } catch (...) {
-                    runner_failure = std::current_exception();
-                }
-                pending_stop.request_stop();
-            });
+        } catch (...) {
+            glove.close();
+            throw;
+        }
+
+        std::stop_source pending_stop;
+        std::exception_ptr join_failure;
+        std::thread observer([&] {
+            try {
+                glove.join();
+            } catch (...) {
+                join_failure = std::current_exception();
+            }
+            pending_stop.request_stop();
+        });
+
+        try {
             for (std::uint64_t index = 0; index < options.samples; ++index) {
                 auto pending =
                     wait_for_output(output, executor, pending_stop.get_token());
                 example::print_output(pending.get());
             }
         } catch (...) {
-            failure = std::current_exception();
-        }
-        if (background_started) {
-            try {
-                if (!pending_stop.stop_requested()) glove.request_stop();
-            } catch (const qnbot::LifecycleError&) {
-                // The runner can finish before the stop request reaches it.
-            } catch (const qnbot::ClosedHandleError&) {
-                // The owner can close while output consumption is pending.
-            }
-            if (observer.joinable()) {
-                observer.join();
-            } else {
-                // Thread creation can fail after background startup succeeded.
-                try {
-                    glove.join();
-                } catch (...) {
-                    runner_failure = std::current_exception();
-                }
-            }
-        }
-        if (runner_failure) failure = runner_failure;
-        try {
+            if (!pending_stop.stop_requested()) glove.request_stop();
+            observer.join();
             glove.close();
-        } catch (...) {
-            if (!failure) failure = std::current_exception();
+            throw;
         }
-        if (failure) std::rethrow_exception(failure);
+        if (!pending_stop.stop_requested()) glove.request_stop();
+        observer.join();
+        glove.close();
+        if (join_failure) std::rethrow_exception(join_failure);
         std::cout << "async runtime complete\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

@@ -23,22 +23,23 @@ def main() -> None:
         ),
     )
     exo = sdk.exo()
-    device = exo.device()
-    if not device.get_device_info().capabilities.haptics:
-        print("this device reports no haptics")
+    try:
+        device = exo.device()
+        if not device.get_device_info().capabilities.haptics:
+            print("this device reports no haptics")
+            return
+
+        exo.start()
+        haptics = device.haptics()
+        haptics.set(ExoHaptics(left=options.left, right=options.right))
+        print(f"set left={options.left} right={options.right}")
+        time.sleep(options.hold)
+
+        haptics.clear()
+        print("haptics cleared")
+        exo.stop()
+    finally:
         exo.close()
-        return
-
-    exo.start()
-    haptics = device.haptics()
-    haptics.set(ExoHaptics(left=options.left, right=options.right))
-    print(f"set left={options.left} right={options.right}")
-    time.sleep(options.hold)
-
-    haptics.clear()
-    print("haptics cleared")
-    exo.stop()
-    exo.close()
 
 
 if __name__ == "__main__":

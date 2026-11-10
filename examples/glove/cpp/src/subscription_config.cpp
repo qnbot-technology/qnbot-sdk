@@ -52,18 +52,13 @@ int main(int argc, char** argv) {
                 ++count;
                 last_sequence = sample.sequence;
             });
-        try {
-            glove.start();
-            glove.run_background();
-            std::cout << "mode=" << mode << " max_rate_hz=" << max_rate_hz
-                      << std::endl;
-            std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
-            glove.request_stop();
-            glove.join();
-        } catch (...) {
-            glove.close();
-            throw;
-        }
+        glove.start();
+        glove.run_background();
+        std::cout << "mode=" << mode << " max_rate_hz=" << max_rate_hz
+                  << std::endl;
+        std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
+        glove.request_stop();
+        glove.join();
         static_cast<void>(subscription);
         glove.close();
         const double observed_hz =

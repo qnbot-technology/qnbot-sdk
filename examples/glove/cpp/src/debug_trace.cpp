@@ -84,14 +84,9 @@ int main(int argc, char** argv) {
             device.output(example::default_target_name)
                 .subscribe(example::print_output);
 
-        try {
-            glove.start();
-            std::cout << "ready; press Ctrl+C to stop" << std::endl;
-            glove.run_forever();
-        } catch (...) {
-            glove.close();
-            throw;
-        }
+        glove.start();
+        std::cout << "ready; press Ctrl+C to stop" << std::endl;
+        glove.run_forever();
         static_cast<void>(output_subscription);
         glove.close();
         return EXIT_SUCCESS;

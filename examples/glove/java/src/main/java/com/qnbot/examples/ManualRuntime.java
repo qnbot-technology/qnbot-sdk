@@ -1,13 +1,11 @@
 package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
 import com.qnbot.sdk.SleepResult;
 import com.qnbot.sdk.android.SerialTransport;
 import com.qnbot.sdk.channel.ReadChannel;
-import com.qnbot.sdk.channel.Sample;
-import com.qnbot.sdk.config.AlgorithmsConfig;
 import com.qnbot.sdk.config.DeviceSelector;
 import com.qnbot.sdk.config.SerialConnection;
 import com.qnbot.sdk.config.Side;
@@ -17,81 +15,49 @@ import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 import com.qnbot.sdk.glove.HandJointCommand;
-import com.qnbot.sdk.glove.calibration.CalibrationJobState;
-import com.qnbot.sdk.glove.capture.CaptureConfig;
-import com.qnbot.sdk.glove.capture.CaptureInteractionMode;
-import com.qnbot.sdk.glove.capture.CaptureSessionState;
-import com.qnbot.sdk.glove.capture.CaptureStageState;
-import java.util.HashSet;
-import java.util.Optional;
-import java.util.Set;
-import java.util.function.Predicate;
 
-/** ManualRuntime: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Advances Glove work manually for a requested number of updates.
+ *
+ * <p>Pass the host {@link Context}, an authorized transport, the glove port and side, the installed
+ * algorithm package, and a positive update count. Each step waits for scheduled work, yields
+ * briefly when the SDK has none, then prints the latest retargeted output.
+ */
 public final class ManualRuntime {
   private ManualRuntime() {}
 
   public static void run(Context context, SerialTransport transport, String port, Side side,
-      String packageId, double seconds, Predicate<String> confirm) throws Exception {
-    if (!Double.isFinite(seconds) || seconds <= 0)
-      throw new IllegalArgumentException("seconds must be positive and finite");
-    SdkConfig config =
-        SdkConfig.builder()
-            .device(GloveConfig.builder()
-                        .name("primary")
-                        .side(side)
-                        .connection(SerialConnection.port(port))
-                        .build())
-            .algorithms(new AlgorithmsConfig(
-                null, new CaptureConfig(CaptureInteractionMode.EXTERNAL, false, "default")))
-            .target(TargetConfig.builder()
-                        .name("openxr_hand")
-                        .side(side)
-                        .source(new DeviceSelector("glove", "primary", side))
-                        .algorithm(new TargetAlgorithm(packageId))
-                        .build())
-            .build();
-    try (GloveSdk sdk = new GloveSdk(config, context, transport); Glove glove = sdk.glove()) {
+      String packageId, int updates) throws InterruptedException {
+    if (updates <= 0)
+      throw new IllegalArgumentException("updates must be positive");
+    SdkConfig config = SdkConfig.builder()
+        .device(GloveConfig.builder()
+                    .name("primary")
+                    .side(side)
+                    .connection(SerialConnection.port(port))
+                    .build())
+        .target(TargetConfig.builder()
+                    .name("openxr_hand")
+                    .side(side)
+                    .source(new DeviceSelector("glove", "primary", side))
+                    .algorithm(new TargetAlgorithm(packageId))
+                    .build())
+        .build();
+    try (Sdk sdk = new Sdk(config, context, transport); Glove glove = sdk.glove()) {
       GloveDevice device = glove.device();
       ReadChannel<HandJointCommand> output = device.output("openxr_hand");
-      Set<String> captureConfirmed = new HashSet<>();
       glove.start();
-      long previous = -1;
-      long deadline = System.nanoTime() + (long) (seconds * 1_000_000_000L);
-      while (System.nanoTime() < deadline) {
-        device.calibrationProgress("openxr_hand").latest().ifPresent(sample -> {
-          if (sample.value.job.state == CalibrationJobState.FAILED
-              || sample.value.job.state == CalibrationJobState.CANCELLED) {
-            throw new IllegalStateException(sample.value.job.failure == null
-                    ? "Calibration stopped"
-                    : sample.value.job.failure.message);
-          }
-        });
-        device.captureProgress().latest().ifPresent(sample -> {
-          var progress = sample.value;
-          if (progress.sessionState == CaptureSessionState.FAILED
-              || progress.sessionState == CaptureSessionState.CANCELLED) {
-            throw new IllegalStateException(
-                progress.failure == null ? "Capture stopped" : progress.failure.message);
-          }
-          var stage = progress.stage;
-          if (stage.state == CaptureStageState.AWAITING_CONFIRMATION && stage.requestId != null
-              && !captureConfirmed.contains(stage.requestId)) {
-            if (!confirm.test(device.name() + " " + stage.prompt)) {
-              throw new java.util.concurrent.CancellationException("Capture cancelled by caller");
-            }
-            device.captureControl().confirm(stage.requestId);
-            captureConfirmed.add(stage.requestId);
-          }
-        });
-        if (glove.update().sleep() == SleepResult.STOPPED)
+      for (int step = 0; step < updates; step++) {
+        SleepResult outcome = glove.update().sleep();
+        if (outcome == SleepResult.STOPPED)
           break;
-        Optional<Sample<HandJointCommand>> sample = output.latest();
-        if (sample.isPresent() && sample.get().sequence != previous) {
-          previous = sample.get().sequence;
-          System.out.println(
-              "output sequence=" + previous + " joints=" + sample.get().value.joints);
+        if (outcome == SleepResult.NO_TASKS) {
+          // Preparation or Capture still needs the caller; yield instead of spinning.
+          Thread.sleep(10);
         }
+        output.latest().ifPresent(sample
+            -> System.out.println("retargeting sequence=" + sample.sequence
+                + " target=" + sample.value.target + " joints=" + sample.value.joints));
       }
     }
   }

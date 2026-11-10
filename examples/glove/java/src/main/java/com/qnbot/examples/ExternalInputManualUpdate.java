@@ -1,9 +1,11 @@
 package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
+import com.qnbot.sdk.SleepResult;
 import com.qnbot.sdk.android.SerialTransport;
+import com.qnbot.sdk.channel.ReadChannel;
 import com.qnbot.sdk.config.AlgorithmsConfig;
 import com.qnbot.sdk.config.DeviceSelector;
 import com.qnbot.sdk.config.Side;
@@ -16,168 +18,136 @@ import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 import com.qnbot.sdk.glove.GloveNodePose;
 import com.qnbot.sdk.glove.calibration.CalibrationJobState;
+import com.qnbot.sdk.glove.calibration.CalibrationProgress;
 import com.qnbot.sdk.glove.capture.CaptureConfig;
+import com.qnbot.sdk.glove.capture.CaptureControl;
 import com.qnbot.sdk.glove.capture.CaptureInteractionMode;
+import com.qnbot.sdk.glove.capture.CaptureProgress;
 import com.qnbot.sdk.glove.capture.CaptureSessionState;
 import com.qnbot.sdk.glove.capture.CaptureStageState;
-import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import java.util.function.Supplier;
 
-/** ExternalInputManualUpdate: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Pushes application-owned glove frames while the caller advances the SDK manually, then prints
+ * the first retargeting output.
+ *
+ * <p>Supply the Android Context, transport, side, package ID, Capture interaction and confirm
+ * callback. Pass null frames for the built-in synthetic input; the loop ends after 60 seconds,
+ * on cancellation, or when the frame supplier returns null.
+ */
 public final class ExternalInputManualUpdate {
   private ExternalInputManualUpdate() {}
 
+  /**
+   * confirm must return promptly: true confirms the displayed action, false leaves it pending.
+   * cancelled stops the loop before output is published; both callbacks run on the caller thread.
+   */
   public static void run(Context context, SerialTransport transport, Side side, String packageId,
-      String framePath, Predicate<String> confirm, BooleanSupplier cancelled) throws Exception {
-    if (framePath == null || framePath.isEmpty())
-      throw new IllegalArgumentException("Provide a customer-owned five-finger JSONL file");
-    SdkConfig config =
-        SdkConfig.builder()
-            .device(GloveConfig.builder()
-                        .name("primary")
-                        .side(side)
-                        .connection(ExternalConnection.INSTANCE)
-                        .build())
-            .algorithms(new AlgorithmsConfig(
-                null, new CaptureConfig(CaptureInteractionMode.EXTERNAL, false, "default")))
-            .target(TargetConfig.builder()
-                        .name("openxr_hand")
-                        .side(side)
-                        .source(new DeviceSelector("glove", "primary", side))
-                        .algorithm(new TargetAlgorithm(packageId))
-                        .build())
-            .build();
-    try (GloveSdk sdk = new GloveSdk(config, context, transport); Glove glove = sdk.glove()) {
+      CaptureConfig captureConfig, Supplier<ExternalGloveFrame> frames, Predicate<String> confirm,
+      BooleanSupplier cancelled) throws Exception {
+    SdkConfig config = SdkConfig.builder()
+                           .device(GloveConfig.builder()
+                                       .name("primary")
+                                       .side(side)
+                                       .connection(ExternalConnection.INSTANCE)
+                                       .build())
+                           .algorithms(new AlgorithmsConfig(null, captureConfig))
+                           .target(TargetConfig.builder()
+                                       .name("openxr_hand")
+                                       .side(side)
+                                       .source(new DeviceSelector("glove", "primary", side))
+                                       .algorithm(new TargetAlgorithm(packageId))
+                                       .build())
+                           .build();
+    try (Sdk sdk = new Sdk(config, context, transport); Glove glove = sdk.glove()) {
       GloveDevice device = glove.device();
-      AtomicInteger outputs = new AtomicInteger();
-      device.output("openxr_hand").subscribe(sample -> {
-        outputs.incrementAndGet();
-        System.out.println("output sequence=" + sample.sequence + " joints=" + sample.value.joints);
-      });
-      Set<String> captureConfirmed = new HashSet<>();
+      var output = device.output("openxr_hand");
+      ReadChannel<CaptureProgress> captureProgress = device.captureProgress();
+      ReadChannel<CalibrationProgress> calibrationProgress =
+          device.calibrationProgress("openxr_hand");
+      CaptureControl captureControl = device.captureControl();
+      Set<String> handledRequestIds = new HashSet<>();
       glove.start();
-      try (BufferedReader frames = new BufferedReader(
-               new InputStreamReader(new FileInputStream(framePath), StandardCharsets.UTF_8))) {
-        double previousTimestamp = Double.NEGATIVE_INFINITY;
-        double firstTimestamp = 0;
-        long started = 0;
-        int submitted = 0;
-        String line;
-        while (!cancelled.getAsBoolean() && (line = frames.readLine()) != null) {
-          ExternalGloveFrame frame;
-          try {
-            JSONObject value = new JSONObject(line);
-            double timestamp = value.getDouble("timestamp_ms");
-            if (!Double.isFinite(timestamp) || timestamp <= previousTimestamp)
-              throw new IllegalArgumentException("timestamp_ms 必须有限且严格递增");
-            JSONObject fingers = value.getJSONObject("fingers");
-            List<GloveNodePose> poses = new ArrayList<>();
-            for (String finger : List.of("thumb", "index", "middle", "ring", "pinky")) {
-              JSONObject pose = fingers.getJSONObject(finger);
-              JSONArray position = pose.getJSONArray("position");
-              JSONArray rotation = pose.getJSONArray("quaternion_xyzw");
-              if (position.length() != 3 || rotation.length() != 4)
-                throw new IllegalArgumentException("position 需要 3 项，quaternion_xyzw 需要 4 项");
-              poses.add(GloveNodePose.of(
-                  List.of(position.getDouble(0), position.getDouble(1), position.getDouble(2)),
-                  List.of(rotation.getDouble(0), rotation.getDouble(1), rotation.getDouble(2),
-                      rotation.getDouble(3))));
-            }
-            frame = new ExternalGloveFrame(
-                poses.get(0), poses.get(1), poses.get(2), poses.get(3), poses.get(4), timestamp);
-            previousTimestamp = timestamp;
-          } catch (Exception error) {
-            throw new IllegalArgumentException(
-                "外部帧第 " + (submitted + 1) + " 行无效: " + error.getMessage(), error);
-          }
-          if (submitted == 0) {
-            firstTimestamp = frame.timestampMs;
-            started = System.nanoTime();
-          }
-          do {
-            device.calibrationProgress("openxr_hand").latest().ifPresent(sample -> {
-              if (sample.value.job.state == CalibrationJobState.FAILED
-                  || sample.value.job.state == CalibrationJobState.CANCELLED) {
-                throw new IllegalStateException(sample.value.job.failure == null
-                        ? "Calibration stopped"
-                        : sample.value.job.failure.message);
-              }
-            });
-            device.captureProgress().latest().ifPresent(sample -> {
-              var progress = sample.value;
-              if (progress.sessionState == CaptureSessionState.FAILED
-                  || progress.sessionState == CaptureSessionState.CANCELLED) {
-                throw new IllegalStateException(
-                    progress.failure == null ? "Capture stopped" : progress.failure.message);
-              }
-              var stage = progress.stage;
-              if (stage.state == CaptureStageState.AWAITING_CONFIRMATION && stage.requestId != null
-                  && !captureConfirmed.contains(stage.requestId)) {
-                if (!confirm.test(device.name() + " " + stage.prompt)) {
-                  throw new java.util.concurrent.CancellationException(
-                      "Capture cancelled by caller");
-                }
-                device.captureControl().confirm(stage.requestId);
-                captureConfirmed.add(stage.requestId);
-              }
-            });
-            glove.update().sleep();
-            if ((System.nanoTime() - started) / 1_000_000.0 >= frame.timestampMs - firstTimestamp)
-              break;
-            Thread.sleep(10);
-          } while (!cancelled.getAsBoolean());
-          if (cancelled.getAsBoolean())
-            break;
-          device.pushFrame(frame);
-          submitted++;
-          glove.update().sleep();
+      long deadline = System.nanoTime() + 60_000_000_000L;
+      int step = 1;
+      while (!cancelled.getAsBoolean() && System.nanoTime() < deadline
+          && output.latest().isEmpty()) {
+        failIfPreparationFailed(captureProgress, calibrationProgress);
+        ExternalGloveFrame input = frames == null ? frame(step++) : frames.get();
+        if (input == null) {
+          break;
         }
-        System.out.println("submitted frames=" + submitted);
-        long deadline = System.nanoTime() + 2_000_000_000L;
-        while (!cancelled.getAsBoolean() && System.nanoTime() < deadline) {
-          device.calibrationProgress("openxr_hand").latest().ifPresent(sample -> {
-            if (sample.value.job.state == CalibrationJobState.FAILED
-                || sample.value.job.state == CalibrationJobState.CANCELLED) {
-              throw new IllegalStateException(sample.value.job.failure == null
-                      ? "Calibration stopped"
-                      : sample.value.job.failure.message);
-            }
-          });
-          device.captureProgress().latest().ifPresent(sample -> {
-            var progress = sample.value;
-            if (progress.sessionState == CaptureSessionState.FAILED
-                || progress.sessionState == CaptureSessionState.CANCELLED) {
-              throw new IllegalStateException(
-                  progress.failure == null ? "Capture stopped" : progress.failure.message);
-            }
-            var stage = progress.stage;
-            if (stage.state == CaptureStageState.AWAITING_CONFIRMATION && stage.requestId != null
-                && !captureConfirmed.contains(stage.requestId)) {
-              if (!confirm.test(device.name() + " " + stage.prompt)) {
-                throw new java.util.concurrent.CancellationException("Capture cancelled by caller");
-              }
-              device.captureControl().confirm(stage.requestId);
-              captureConfirmed.add(stage.requestId);
-            }
-          });
-          glove.update().sleep();
-          Thread.sleep(20);
+        device.pushFrame(input);
+        var update = glove.update();
+        if (captureConfig.interaction == CaptureInteractionMode.EXTERNAL) {
+          handleCapturePrompt(captureProgress, captureControl, handledRequestIds, confirm,
+              device.name());
         }
-        if (!cancelled.getAsBoolean() && outputs.get() == 0)
-          throw new IllegalStateException(
-              "No target output after input; check algorithm and capture prompts");
+        if (!update.hasNextTask) {
+          Thread.sleep(10);
+        } else if (update.sleep() == SleepResult.STOPPED) {
+          break;
+        }
       }
+      if (cancelled.getAsBoolean()) {
+        return;
+      }
+      var sample = output.latest().orElseThrow(
+          ()
+              -> new IllegalStateException("External input did not publish retargeting output "
+                  + "before input ended or timed out"));
+      System.out.println("latest retargeting output sequence=" + sample.sequence
+          + " target=" + sample.value.target + " joints=" + sample.value.joints);
     }
+    System.out.println("external manual input complete");
+  }
+
+  private static void failIfPreparationFailed(ReadChannel<CaptureProgress> captureProgress,
+      ReadChannel<CalibrationProgress> calibrationProgress) {
+    captureProgress.latest().ifPresent(sample -> {
+      var progress = sample.value;
+      if (progress.sessionState == CaptureSessionState.FAILED
+          || progress.sessionState == CaptureSessionState.CANCELLED) {
+        throw new IllegalStateException(
+            progress.failure == null ? "Capture stopped" : progress.failure.message);
+      }
+    });
+    calibrationProgress.latest().ifPresent(sample -> {
+      if (sample.value.job.state == CalibrationJobState.FAILED) {
+        throw new IllegalStateException(sample.value.job.failure == null
+                ? "Calibration stopped"
+                : sample.value.job.failure.message);
+      }
+    });
+  }
+
+  private static void handleCapturePrompt(ReadChannel<CaptureProgress> captureProgress,
+      CaptureControl captureControl, Set<String> handledRequestIds, Predicate<String> confirm,
+      String sourceName) {
+    captureProgress.latest().ifPresent(sample -> {
+      var stage = sample.value.stage;
+      if (stage.state == CaptureStageState.AWAITING_CONFIRMATION && stage.requestId != null
+          && !handledRequestIds.contains(stage.requestId)
+          && confirm.test(sourceName + " " + stage.prompt)) {
+        captureControl.confirm(stage.requestId);
+        handledRequestIds.add(stage.requestId);
+      }
+    });
+  }
+
+  private static ExternalGloveFrame frame(int step) {
+    double offset = step * 0.001;
+    return new ExternalGloveFrame(node(0.01 + offset, 0.02, 0.03), node(0.02 + offset, 0.03, 0.04),
+        node(0.03 + offset, 0.04, 0.05), node(0.04 + offset, 0.05, 0.06),
+        node(0.05 + offset, 0.06, 0.07), step * 10.0);
+  }
+
+  private static GloveNodePose node(double x, double y, double z) {
+    return GloveNodePose.of(List.of(x, y, z), List.of(0.0, 0.0, 0.0, 1.0));
   }
 }

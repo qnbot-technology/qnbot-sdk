@@ -2,7 +2,7 @@
 
 `src/` 目录存放可以直接运行的示例源码，不存放 SDK 自身的实现代码。
 
-本目录提供可直接构建的 C++ 客户示例，覆盖设备发现、手套姿态、有线 IMU 原始数据、
+本目录提供可直接构建的 C++ 客户示例，覆盖设备发现、手套姿态、IMU 原始数据、
 目标手输出、运行模式、触觉反馈以及采集与标定。
 可运行的示例源码统一位于 `src/` 目录。
 
@@ -98,7 +98,7 @@ cmake --build build-selection --config Release --target device_selection
 | `algorithm_configuration` | C++17 | 是 | 是 | 使用已有骨长配置和算法参数覆盖文件 |
 | `quick_start` | C++17 | 是 | 否 | 零参数读取单只手套姿态 |
 | `time_sync` | C++17 | 是 | 否 | 在后台运行并定期使用外部时间源提供的 Unix 毫秒时间同步 Glove 时钟后读取姿态 |
-| `imu` | C++17 | 是 | 否 | 读取有线 IMU 原始计数 |
+| `imu` | C++17 | 是 | 否 | 读取有线或兼容无线手套的 IMU 原始计数 |
 | `manual_runtime` | C++17 | 是 | 是 | 由应用控制每次更新 |
 | `foreground_runtime` | C++17 | 是 | 是 | 在当前线程持续运行 |
 | `background_runtime` | C++17 | 是 | 是 | 在后台运行并主动停止 |
@@ -222,6 +222,8 @@ cmake --build build-selection --config Release --target device_selection
 
 同一操作者、手套和手侧下，再次运行或切换目标包会复用兼容采集，不重复摆已采动作；新目标仍会计算自己的标定结果。使用 `--force` 才重新采集全部八步。升级前保存的采集若不兼容，程序会重新请求这八步；完成一次后恢复正常复用。`host_capture_calibration` 示例逐个确认计划中的动作。
 
+包含步骤选择更新的 SDK 支持在该示例的等待确认提示中输入 `stage <stage_id>`，例如 `stage pinch_little`。步骤 ID 和当前状态会列在提示上方；可选择待采动作或重采已完成动作，按 Enter 确认采集，输入 `n` 取消。跳转不算采集完成，重采会替换该动作的数据；其他已完成动作保留，全部必采动作仍需采齐。首次包含此更新的发布版本未定，使用这项交互前升级到包含该更新的匹配 SDK。
+
 完整复用当前采集数据时，已有的兼容标定结果保持不变。包含取消结果修复的 SDK 在标定会话被取消后丢弃本次新结果，保留上一份兼容的有效标定；没有旧结果时，下次运行仍需完成标定。首个包含该修复的发布版本尚未确定，Core/Glove 1.5.0 仍可能保留已取消会话的新结果。
 使用 `--force` 成功完成新采集后，需要基于新数据完成标定才能恢复目标输出。
 
@@ -240,7 +242,34 @@ cmake --build build-selection --config Release --target device_selection
 在 macOS 上，首次请求 Skeleton 可能需要一次性准备时间；请像示例一样在启动设备前完成，
 再进入需要及时响应的循环。仅做设备选择或读取原始姿态时无需请求 Skeleton。
 
-`imu` 先注册有线 IMU callback 再调用 `start()`；`subscribe()` 可以在启动前或启动后调用。数据在 `start()` 之后才可能产出：`start()` 返回后需要等第一条有效帧，`latest()` 在该帧发布前返回 `std::nullopt`，而不是启动失败。它输出有符号 16 位 `gyroscope_raw` 和 `accelerometer_raw` 原始计数，SDK 不做单位换算、校准、滤波、偏置修正或融合。示例只支持 USB 串口直连手套的有线 IMU 原始数据，不支持无线 Receiver 手套的 IMU 数据；有线 IMU 原始数据不需要目标手算法包。异步程序可使用 `imu.next()` 等待样本。
+`imu` 需要一只提供 IMU 的手套，不需要目标手算法包。程序持续输出 `source`、`sequence`、`valid`、`gyroscope_raw` 和 `accelerometer_raw`；`valid=false` 时仍输出原始计数，按 `Ctrl+C` 停止。启动成功后仍须等待第一条有效样本。
+
+### 无线 IMU（待发布）
+
+无线 IMU 需要包含此功能的 SDK 和支持同手姿态/IMU 组合输出的配套手套、Receiver 固件；首个 SDK 发布版本未定，1.7.0 不支持。安装产品交付说明指定的匹配版本后，将端口替换为 Receiver 端口，并选择在线手套：
+
+```bash
+./build/imu --port /dev/ttyACM0 --side left
+```
+
+预期持续输出所选手套的 IMU 原始计数。没有 IMU 输出时，确认固件支持组合输出、所选手套在线，并检查启动错误；只有姿态的设备不会产生 IMU。不要同时运行多个示例进程争用同一 Receiver 端口。
+
+### 触觉ENF定位手套（VetraGlove HMP-MX）
+
+安装同一版本且支持触觉ENF定位手套的 Core 和 Glove SDK。连接一只按出厂设置主动上报压感的 VetraGlove HMP-MX 手套，在交互式终端运行，并将示例端口替换为实际串口。
+
+**460 点压感是 HMP-MX 独有的通道：只有这只手套提供 `pressure()`，Nano、Pro 和 Receiver 手套没有该通道。**
+
+```bash
+cmake -S . -B build-pressure -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH=/path/to/qnbot \
+  -DQNBOT_BUILD_PRESSURE_EXAMPLE=ON
+cmake --build build-pressure --config Release --target pressure
+./build-pressure/pressure --port /dev/ttyACM0
+```
+
+程序只订阅压感，每秒输出一帧 `pressure`：`points=460` 为测点总数，`first_raw` 为首点原始值，读数范围为 0–255。未上报压感时没有新样本。按 `Ctrl+C` 停止。姿态、IMU 和 Skeleton 使用对应的通用示例。
 
 ## 订阅交付配置
 

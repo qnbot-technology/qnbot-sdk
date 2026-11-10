@@ -26,6 +26,7 @@ int main() {
         std::cout << "running; press Ctrl+C to stop" << std::endl;
         exo.run_forever();
         static_cast<void>(subscription);
+        exo.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
         return example::report_error(error);

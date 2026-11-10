@@ -82,72 +82,66 @@ int main(int argc, char** argv) {
         config.devices = {left_config, right_config};
         qnbot::Sdk sdk(std::move(config));
         auto glove = sdk.glove();
-        try {
-            auto left = glove.device("left");
-            auto right = glove.device("right");
-            auto left_pose = left.pose();
-            auto right_pose = right.pose();
-            const auto observe = [&](bool right_active) {
-                auto left_previous = left_pose.latest();
-                auto right_previous = right_pose.latest();
-                std::optional<std::uint64_t> left_sequence;
-                std::optional<std::uint64_t> right_sequence;
-                if (left_previous) left_sequence = left_previous->sequence;
-                if (right_previous) right_sequence = right_previous->sequence;
-                std::uint64_t left_count = 0;
-                std::uint64_t right_count = 0;
-                const auto deadline =
-                    std::chrono::steady_clock::now() + std::chrono::seconds(10);
-                while (left_count < options.updates ||
-                       (right_active && right_count < options.updates)) {
-                    if (std::chrono::steady_clock::now() >= deadline) {
-                        throw std::runtime_error(
-                            "timed out waiting for pose samples");
-                    }
-                    const auto update = glove.update();
-                    const auto left_sample = left_pose.latest();
-                    const auto right_sample = right_pose.latest();
-                    const auto current_right =
-                        right_sample ? std::optional<std::uint64_t>(
-                                           right_sample->sequence)
-                                     : std::nullopt;
-                    if (!right_active && current_right != right_sequence) {
-                        throw std::runtime_error(
-                            "right pose advanced while stopped");
-                    }
-                    if (left_sample && left_sample->sequence != left_sequence) {
-                        left_sequence = left_sample->sequence;
-                        ++left_count;
-                        print_pose("left", *left_sample);
-                    }
-                    if (right_active && right_sample &&
-                        right_sample->sequence != right_sequence) {
-                        right_sequence = right_sample->sequence;
-                        ++right_count;
-                        print_pose("right", *right_sample);
-                    }
-                    if (update.sleep() == qnbot::SleepResult::no_tasks) {
-                        std::this_thread::sleep_for(
-                            std::chrono::milliseconds(10));
-                    }
+        auto left = glove.device("left");
+        auto right = glove.device("right");
+        auto left_pose = left.pose();
+        auto right_pose = right.pose();
+        const auto observe = [&](bool right_active) {
+            auto left_previous = left_pose.latest();
+            auto right_previous = right_pose.latest();
+            std::optional<std::uint64_t> left_sequence;
+            std::optional<std::uint64_t> right_sequence;
+            if (left_previous) left_sequence = left_previous->sequence;
+            if (right_previous) right_sequence = right_previous->sequence;
+            std::uint64_t left_count = 0;
+            std::uint64_t right_count = 0;
+            const auto deadline =
+                std::chrono::steady_clock::now() + std::chrono::seconds(10);
+            while (left_count < options.updates ||
+                   (right_active && right_count < options.updates)) {
+                if (std::chrono::steady_clock::now() >= deadline) {
+                    throw std::runtime_error(
+                        "timed out waiting for pose samples");
                 }
-            };
+                const auto update = glove.update();
+                const auto left_sample = left_pose.latest();
+                const auto right_sample = right_pose.latest();
+                const auto current_right =
+                    right_sample
+                        ? std::optional<std::uint64_t>(right_sample->sequence)
+                        : std::nullopt;
+                if (!right_active && current_right != right_sequence) {
+                    throw std::runtime_error(
+                        "right pose advanced while stopped");
+                }
+                if (left_sample && left_sample->sequence != left_sequence) {
+                    left_sequence = left_sample->sequence;
+                    ++left_count;
+                    print_pose("left", *left_sample);
+                }
+                if (right_active && right_sample &&
+                    right_sample->sequence != right_sequence) {
+                    right_sequence = right_sample->sequence;
+                    ++right_count;
+                    print_pose("right", *right_sample);
+                }
+                if (update.sleep() == qnbot::SleepResult::no_tasks) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            }
+        };
 
-            left.start();
-            right.start();
-            std::cout << "both devices active\n";
-            observe(true);
-            right.stop();
-            std::cout << "right device stopped; left remains active\n";
-            observe(false);
-            right.start();
-            std::cout << "right device restarted\n";
-            observe(true);
-            std::cout << "lifecycle complete\n";
-        } catch (...) {
-            glove.close();
-            throw;
-        }
+        left.start();
+        right.start();
+        std::cout << "both devices active\n";
+        observe(true);
+        right.stop();
+        std::cout << "right device stopped; left remains active\n";
+        observe(false);
+        right.start();
+        std::cout << "right device restarted\n";
+        observe(true);
+        std::cout << "lifecycle complete\n";
         glove.close();
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

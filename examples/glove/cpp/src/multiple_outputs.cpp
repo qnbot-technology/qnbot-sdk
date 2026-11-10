@@ -70,14 +70,9 @@ int main(int argc, char** argv) {
                 example::print_output(sample);
             });
 
-        try {
-            glove.start();
-            std::cout << "running; press Ctrl+C to stop" << std::endl;
-            glove.run_forever();
-        } catch (...) {
-            glove.close();
-            throw;
-        }
+        glove.start();
+        std::cout << "running; press Ctrl+C to stop" << std::endl;
+        glove.run_forever();
         static_cast<void>(primary_subscription);
         static_cast<void>(backup_subscription);
         glove.close();

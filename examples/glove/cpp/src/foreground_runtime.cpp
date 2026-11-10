@@ -25,13 +25,8 @@ int main(int argc, char** argv) {
         const auto subscription = device.output(example::default_target_name)
                                       .subscribe(example::print_output);
         glove.start();
-        try {
-            std::cout << "running; press Ctrl+C to stop" << std::endl;
-            glove.run_forever();
-        } catch (...) {
-            glove.close();
-            throw;
-        }
+        std::cout << "running; press Ctrl+C to stop" << std::endl;
+        glove.run_forever();
         static_cast<void>(subscription);
         glove.close();
         return EXIT_SUCCESS;

@@ -1,7 +1,8 @@
 # QnBot SDK Glove 示例
 
 本目录提供手套组件（Glove）的 Python、C++ 与 Android Java 客户示例，覆盖设备发现、手套姿态、有线
-IMU 原始数据、目标手输出、运行模式、触觉反馈以及采集与标定。
+IMU 原始数据、目标手输出、运行模式、触觉反馈以及采集与标定。触觉ENF定位手套（VetraGlove HMP-MX）
+另有 460 点压感通道，其他手套型号不提供。
 `device_lifecycle` 展示两只手套独立启停，支持共用同一 Receiver。运行命令见对应语言说明。
 `device_info` 读取手套信息及连接类型，有线和无线共用。
 其中 `time_sync` 示例演示使用外部时间源提供的 Unix 毫秒时间同步 Glove 时间域，并在后台每隔一段时间重新同步。传给 `sync_time` 的 `reference_time_ms` 单位是毫秒，不是纳秒。

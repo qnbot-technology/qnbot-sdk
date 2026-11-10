@@ -1,7 +1,7 @@
 package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
 import com.qnbot.sdk.android.SerialTransport;
 import com.qnbot.sdk.config.CompositeExoGloveConfig;
@@ -13,48 +13,43 @@ import com.qnbot.sdk.exo.ExoDevice;
 import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
-import com.qnbot.sdk.glove.GloveFinger;
 
-/** Lifecycle: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Runs one bounded composite lifecycle: start the root Sdk, advance one update, print the member
+ * sources and the latest glove pose and Exo telemetry samples, then stop and close. Callers supply
+ * an authorized transport and the shared port; the method returns after cleanup.
+ */
 public final class Lifecycle {
   private Lifecycle() {}
 
-  public static void run(Context context, SerialTransport transport, String port) throws Exception {
+  public static void run(Context context, SerialTransport transport, String port) {
     SdkConfig config = SdkConfig.builder()
-                           .device(CompositeExoGloveConfig.builder()
-                                       .connection(SerialConnection.port(port))
-                                       .devices(GloveConfig.builder().side(Side.LEFT).build(),
-                                           GloveConfig.builder().side(Side.RIGHT).build(),
-                                           ExoConfig.builder().build())
-                                       .build())
-                           .build();
-    try (GloveSdk sdk = new GloveSdk(config, context, transport)) {
+        .device(CompositeExoGloveConfig.builder()
+            .connection(SerialConnection.port(port))
+            .devices(GloveConfig.builder().side(Side.LEFT).build(),
+                GloveConfig.builder().side(Side.RIGHT).build(), ExoConfig.builder().build())
+            .build())
+        .build();
+    try (Sdk sdk = new Sdk(config, context, transport)) {
+      // One root Sdk owns the shared link and both member domains.
       Glove glove = sdk.glove();
-      Exo exo = new Exo(sdk);
+      Exo exo = sdk.exo();
       GloveDevice left = glove.device(Side.LEFT);
       GloveDevice right = glove.device(Side.RIGHT);
       ExoDevice exoDevice = exo.device();
-      left.pose().subscribe(sample
-          -> System.out.println("left sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
-      right.pose().subscribe(sample
-          -> System.out.println("right sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
-      exoDevice.telemetry().subscribe(sample
-          -> System.out.println("Exo sequence=" + sample.sequence
-              + " leftRadians=" + sample.value.payload.leftArm.jointPositionsRad
-              + " rightRadians=" + sample.value.payload.rightArm.jointPositionsRad));
       sdk.start();
-      sdk.runBackground();
-      try {
-        Thread.sleep(3000);
-      } finally {
-        sdk.requestStop();
-        sdk.join();
-        sdk.stop();
-      }
+      sdk.update();
+      System.out.println("started Left Glove=" + left.sourceId()
+          + " Right Glove=" + right.sourceId() + " Exo=" + exoDevice.sourceId());
+      left.pose().latest().ifPresent(
+          sample -> System.out.println("left sequence=" + sample.sequence));
+      right.pose().latest().ifPresent(
+          sample -> System.out.println("right sequence=" + sample.sequence));
+      exoDevice.telemetry().latest().ifPresent(
+          sample -> System.out.println("Exo sequence=" + sample.sequence));
+      sdk.stop();
+      System.out.println("stopped");
     }
+    System.out.println("closed");
   }
 }

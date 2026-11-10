@@ -1,7 +1,7 @@
 package com.qnbot.examples;
 
 import android.content.Context;
-import com.qnbot.sdk.GloveSdk;
+import com.qnbot.sdk.Sdk;
 import com.qnbot.sdk.SdkConfig;
 import com.qnbot.sdk.android.SerialTransport;
 import com.qnbot.sdk.config.CompositeExoGloveConfig;
@@ -11,15 +11,16 @@ import com.qnbot.sdk.exo.Exo;
 import com.qnbot.sdk.exo.ExoConfig;
 import com.qnbot.sdk.exo.ExoDevice;
 import com.qnbot.sdk.exo.ExoImuState;
-import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
-import com.qnbot.sdk.glove.GloveDevice;
 
-/** Imu: the SDK workflow, invoked by an existing Android consumer. */
+/**
+ * Reads the Exo IMUs reported by a composite Exo+Glove device. The shared link does not expose raw
+ * glove IMU, so this example checks the Exo capability and subscribes to Exo telemetry only.
+ */
 public final class Imu {
   private Imu() {}
 
-  public static void run(Context context, SerialTransport transport, String port) throws Exception {
+  public static void run(Context context, SerialTransport transport, String port) {
     SdkConfig config = SdkConfig.builder()
                            .device(CompositeExoGloveConfig.builder()
                                        .connection(SerialConnection.port(port))
@@ -28,11 +29,8 @@ public final class Imu {
                                            ExoConfig.builder().build())
                                        .build())
                            .build();
-    try (GloveSdk sdk = new GloveSdk(config, context, transport)) {
-      Glove glove = sdk.glove();
-      Exo exo = new Exo(sdk);
-      GloveDevice left = glove.device(Side.LEFT);
-      GloveDevice right = glove.device(Side.RIGHT);
+    try (Sdk sdk = new Sdk(config, context, transport)) {
+      Exo exo = sdk.exo();
       ExoDevice exoDevice = exo.device();
       if (!exoDevice.getDeviceInfo().capabilities.imus) {
         System.out.println("Exo has no IMU capability; composite Glove raw IMU is unavailable");

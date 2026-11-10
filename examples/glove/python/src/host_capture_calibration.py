@@ -125,8 +125,21 @@ def capture_side(
                 or snapshot.current_stage
                 or "Continue capture"
             )
-            answer = input(f"{device.source_id} {prompt} [Y/n]: ").strip().lower()
-            if answer in ("", "confirm", "y", "yes"):
+            for stage in snapshot.stage_progress:
+                print(f"  {stage.stage_id}: {stage.state.value}")
+            answer = input(
+                f"{device.source_id} {prompt} [Enter / stage <id> / n]: "
+            ).strip()
+            if answer.startswith("stage "):
+                stage_id = answer[6:].strip()
+                if stage_id == snapshot.current_stage or not any(
+                    stage.stage_id == stage_id for stage in snapshot.plan.stages
+                ):
+                    print("choose a different listed stage")
+                    continue
+                session.retry(stage_id)
+                continue
+            if answer.lower() in ("", "confirm", "y", "yes"):
                 session.confirm(snapshot.request_id)
             else:
                 session.cancel()
