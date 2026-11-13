@@ -98,7 +98,8 @@ cmake --build build-selection --config Release --target device_selection
 | `algorithm_configuration` | C++17 | 是 | 是 | 使用已有骨长配置和算法参数覆盖文件 |
 | `quick_start` | C++17 | 是 | 否 | 零参数读取单只手套姿态 |
 | `time_sync` | C++17 | 是 | 否 | 在后台运行并定期使用外部时间源提供的 Unix 毫秒时间同步 Glove 时钟后读取姿态 |
-| `imu` | C++17 | 是 | 否 | 读取有线或兼容无线手套的 IMU 原始计数 |
+| `imu` | C++17 | 是 | 否 | 读取手套的带单位 IMU 数据 |
+| `emf` | C++17 | 是，支持 EMF 的手套 | 否 | 读取与 pose 配对的原始 EMF 矩阵和实际通道信息 |
 | `manual_runtime` | C++17 | 是 | 是 | 由应用控制每次更新 |
 | `foreground_runtime` | C++17 | 是 | 是 | 在当前线程持续运行 |
 | `background_runtime` | C++17 | 是 | 是 | 在后台运行并主动停止 |
@@ -108,6 +109,7 @@ cmake --build build-selection --config Release --target device_selection
 | `device_lifecycle` | C++17 | 是，两只 | 否 | 多只手套的独立启停：停止、重启其中一只，其他手套继续输出 |
 | `haptics` | C++17 | 是 | 否 | 设置并清除触觉反馈 |
 | `host_capture_calibration` | C++17 | 是，两只 | 否，可选目标包 | 完成左右手采集并保存、应用标定结果 |
+| `pressure` | C++17 | 是，HMP-MX | 否 | 读取整帧压力摘要和所选点 |
 
 两个 external input 示例都需要显式提供 `--package-id`，默认由 SDK 在可交互终端提示并接收采集确认（`auto_terminal`）。
 后台示例启动后会返回并继续推帧，**返回不代表标定完成**；按终端提示完成动作期间也要持续提供帧，
@@ -242,7 +244,19 @@ cmake --build build-selection --config Release --target device_selection
 在 macOS 上，首次请求 Skeleton 可能需要一次性准备时间；请像示例一样在启动设备前完成，
 再进入需要及时响应的循环。仅做设备选择或读取原始姿态时无需请求 Skeleton。
 
-`imu` 需要一只提供 IMU 的手套，不需要目标手算法包。程序持续输出 `source`、`sequence`、`valid`、`gyroscope_raw` 和 `accelerometer_raw`；`valid=false` 时仍输出原始计数，按 `Ctrl+C` 停止。启动成功后仍须等待第一条有效样本。
+`imu` 需要一只支持 IMU 输出的手套，不需要目标手算法包。程序按通道输出 id、位置、有效性、fresh，以及 raw_counts 或 gyro_mdps/accel_mg 数值；无效与缺失值分别显示，按 `Ctrl+C` 停止。启动成功后仍须等待第一条有效样本。
+
+### Helix USB CDC
+
+连接 Helix，安装支持 Helix 的配套 SDK 构建，再运行设备信息示例。将 `/dev/ttyACM0` 和 `left` 替换为实际端口和手别。
+
+```bash
+./build/device_info --port /dev/ttyACM0 --side left
+```
+
+终端显示设备序列号、型号、固件版本、手别和连接类型。只连接这一只手套，再运行 `./build/quick_start`。终端持续显示姿态序列号和 `fingertips=5`，按 Ctrl+C 停止。
+
+使用 Helix 时，`imu()` 通道直接输出多路带单位数据。
 
 ### 无线 IMU（待发布）
 
@@ -252,7 +266,7 @@ cmake --build build-selection --config Release --target device_selection
 ./build/imu --port /dev/ttyACM0 --side left
 ```
 
-预期持续输出所选手套的 IMU 原始计数。没有 IMU 输出时，确认固件支持组合输出、所选手套在线，并检查启动错误；只有姿态的设备不会产生 IMU。不要同时运行多个示例进程争用同一 Receiver 端口。
+预期持续输出所选手套的 IMU 数据和单位标签。没有 IMU 输出时，确认固件支持组合输出、所选手套在线，并检查启动错误；只有姿态的设备不会产生 IMU。不要同时运行多个示例进程争用同一 Receiver 端口。
 
 ### 触觉ENF定位手套（VetraGlove HMP-MX）
 
@@ -269,7 +283,39 @@ cmake --build build-pressure --config Release --target pressure
 ./build-pressure/pressure --port /dev/ttyACM0
 ```
 
-程序只订阅压感，每秒输出一帧 `pressure`：`points=460` 为测点总数，`first_raw` 为首点原始值，读数范围为 0–255。未上报压感时没有新样本。按 `Ctrl+C` 停止。姿态、IMU 和 Skeleton 使用对应的通用示例。
+程序只读取压感，每秒最多显示一帧 `pressure`。`points=460` 是测点数；`raw_min`、`raw_mean`、`raw_max` 汇总全部测点的原始计数（0–255），`peak_index` 是最大原始值首次出现的索引。`point_index`、`point_raw`、`point_estimated_kpa` 是选中测点的索引、原始计数和同一帧的 kPa 估计，默认选择峰值点。指定 `--point 459` 可持续观察第 459 点；索引范围为 0–459，按设备上报顺序排列，按下表定位区域。
+
+`point_row`、`point_column` 分别为 `point_index / 20` 向下取整和 `point_index % 20`。行号 0–22、列号 0–19；映射表中第 0 行在下方，第 0 列在左侧。这是索引网格，不是毫米坐标。按实际手套侧别查表：
+
+| 区域 | 行 | 右手列 | 左手列 |
+| --- | --- | --- | --- |
+| 小指 | 17–22 | 0–3 | 16–19 |
+| 无名指 | 17–22 | 4–7 | 12–15 |
+| 中指 | 17–22 | 8–11 | 8–11 |
+| 食指 | 17–22 | 12–15 | 4–7 |
+| 拇指 | 17–22 | 16–19 | 0–3 |
+| 掌心 | 0–14 | 0–15 | 4–19 |
+
+五指各 24 点，掌心 240 点。第 15–16 行及掌心行之外的 4 列共 100 点在映射表中未分区；示例仍保留并汇总这些值，不把它们当作无效数据或零值。例如索引 459 为第 22 行第 19 列，对应右手拇指或左手小指。
+
+kPa 是依据手掌汇总气压测量得到的估计，未逐点标定，不是力（N），也没有已验证的逐点精度。原始值 107–255 的估计均截顶到约 40.01 kPa，`capped_points` 是落在这个截顶区间的测点数；它不表示传感器已物理饱和或实际压力等于 40.01 kPa。示例保留原始值，kPa 仅显示一位小数。
+
+启动后先显示等待提示。启动完成后约 5 秒仍没有首帧压感时，程序报错退出；检查 HMP-MX 型号、串口和设备是否上报压感。460 点全零仍是有效帧。收到首帧后持续运行，缺少压感块时不生成新帧；1 Hz 显示可能跳过短促按压，观察时保持按压片刻。按 `Ctrl+C` 停止。姿态、IMU 和 Skeleton 使用对应的通用示例。
+
+### 使用完整标定密钥
+
+安装包含 `TargetAlgorithm.calibration_key` 的匹配 Core、Glove SDK 和 CLI；首次发布版本尚未确定。C++ 项目使用整套新 SDK 重新构建，原有调用代码可继续使用。先通过 CLI 完成采集和标定，使用 `calibration run --key-output` 保存一个 `.qnbotkey` 文件。将整个文件复制到数据批次中，不需要查找或复制其他标定文件。
+
+使用导出结果中的相同算法包及版本、操作者、手套和手侧。CLI 采集使用设备名 `primary`，通过 `--source-name primary` 保持一致。消费其他 SDK 程序导出的文件时，使用原程序的设备名；设备未命名时省略 `--source-name`。将下面的 `TARGET_NAME` 替换为标定结果 `target.name`；该值为空时省略 `--target-name`。
+
+```bash
+./build/algorithm_configuration --port /dev/ttyUSB0 --side left \
+  --package-id '<package-id>' --operator-id default \
+  --source-name primary --target-name TARGET_NAME --calibration-key /path/to/batch.qnbotkey \
+  --key-output /path/to/new-batch/effective.qnbotkey
+```
+
+程序读取所选目标的输出，并在运行结束前将实际使用的完整密钥保存到 `--key-output`。预期看到 `retargeting` 数据和 `effective calibration key saved`，后者显示文件路径和 `sha256`；该值应与 CLI 导出结果的 `calibration_key.digest` 相同。将该文件与本次原始数据一起保存。输出目录须已存在，输出文件须不存在。没有成功输出、密钥不匹配或文件内容损坏时，程序报告错误。省略 `--key-output` 只读取数据；省略 `--calibration-key` 保持原来的标定流程。密钥已包含所需骨长和参数配置，使用密钥时无需再次准备骨长或指定参数覆盖文件。
 
 ## 订阅交付配置
 
@@ -336,7 +382,7 @@ cmake --build build-pressure --config Release --target pressure
 - 没有目标手输出：确认已完成终端提示的标定；外部输入示例在标定期间也要持续推帧。
 - 后台自动引导启动报终端错误：在可交互终端运行，或选择 `--capture-interaction external`。
 - 采集被取消或采集/标定失败：示例会报告错误并清理资源，不会继续等待目标输出；保留完整错误信息后排查。
-- 没有 IMU 输出：确认使用支持有线 IMU 的 USB 直连手套，并在 `start()` 后等待第一条有效帧。
+- 没有 IMU 输出：确认 USB 直连手套支持 IMU 输出，并在 `start()` 后等待第一条有效帧。
 
 仍无法解决时，请保留构建命令、运行命令和完整错误信息并联系 QnBot 对接人员。
 
@@ -364,3 +410,15 @@ cmake --build build-pressure --config Release --target pressure
 设备未提供的字段显示 `unknown`。
 
 `device_lifecycle` 无需算法包，依次展示双手输出、停止右手时左手继续输出、重启右手后恢复输出。省略串口参数时自动发现；两只手套使用同一 Receiver 时，`--left-port` 和 `--right-port` 可以填写同一串口。
+
+## 多路 IMU 与原始 EMF
+
+使用配套新版 Core、Glove 包重新构建或安装示例；目标正式版本尚未确定。IMU 示例直接逐项输出通道 id、位置、有效性、fresh 和数值，无需额外参数。普通手套输出 raw_counts；Helix 输出 gyro_mdps 和 accel_mg，缺失值保持缺失。 同一 IMU 示例同时订阅 pose，输出独立 hand/wrist 的 fresh/held、timestamp_ms 和 received_ms；缺失组件显示 absent，无效腕部显示 valid=false 和空向量。腕部 position_m 为米，quaternion_xyzw 按 x/y/z/w 排列。held 组件保留自己的时间，不能当作与本次新组件同时采样。
+
+读取支持设备的原始 EMF，不需要目标手算法包：
+
+```bash
+./build/emf --port /dev/your-glove --side right
+```
+
+程序输出 session、实际存在的帧序号或 sync、channel_id 及四组 3×3 整数矩阵，单位为 demodulated_integral。SDK 自动准备配套采集，客户无需设置采样频率。没有数据时等待首条观测；设备不支持时返回能力错误。按 Ctrl+C 停止。

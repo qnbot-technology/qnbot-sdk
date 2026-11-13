@@ -33,6 +33,9 @@ def main() -> None:
     arguments.add_argument("--side", choices=("left", "right"), required=True)
     arguments.add_argument("--package-id", required=True)
     arguments.add_argument("--operator-id", default="default")
+    arguments.add_argument(
+        "--source-name", help="Exact device name used when exporting the key"
+    )
     preparation = arguments.add_mutually_exclusive_group()
     preparation.add_argument("--prepare-bone-config", action="store_true")
     preparation.add_argument("--bone-config-file")
@@ -41,6 +44,15 @@ def main() -> None:
         "--use-bone-config", choices=("auto", "true", "false"), default="auto"
     )
     arguments.add_argument("--algorithm-config-path")
+    arguments.add_argument(
+        "--calibration-key", help="Complete key file for this target"
+    )
+    arguments.add_argument(
+        "--target-name", help="Exact exported target name; omit for unnamed key target"
+    )
+    arguments.add_argument(
+        "--key-output", help="Save the actual consumed key to a new file"
+    )
     arguments.add_argument("--seconds", type=float, default=10.0)
     options = arguments.parse_args()
     if not math.isfinite(options.seconds) or options.seconds <= 0:
@@ -76,24 +88,36 @@ def main() -> None:
         print(f"bone configuration installed: {installed.path}", flush=True)
         if not installed.cleanup_confirmed:
             print("configuration saved; session cleanup not confirmed", flush=True)
+    target_name = (
+        options.target_name
+        if options.calibration_key
+        else (options.target_name or "configured_hand")
+    )
     usage = {"auto": "auto", "true": True, "false": False}[options.use_bone_config]
     sdk = Sdk(
         devices=(
-            GloveConfig(side=side, connection=SerialConnection(port=options.port)),
+            GloveConfig(
+                name=options.source_name,
+                side=side,
+                connection=SerialConnection(port=options.port),
+            ),
         ),
         algorithms=AlgorithmsConfig(
             capture=CaptureConfig(operator_id=options.operator_id)
         ),
         targets=(
             TargetConfig(
-                name="configured_hand",
+                name=target_name,
                 side=side,
-                source=DeviceSelector(type="glove", side=side),
+                source=DeviceSelector(
+                    type="glove", name=options.source_name, side=side
+                ),
                 algorithms=(
                     TargetAlgorithm(
                         id=options.package_id,
                         use_bone_config=usage,
                         algorithm_config_path=options.algorithm_config_path,
+                        calibration_key=options.calibration_key,
                     ),
                 ),
             ),
@@ -102,7 +126,7 @@ def main() -> None:
     glove = sdk.glove()
     device = glove.device()
     try:
-        device.output(name="configured_hand").subscribe(print_output)
+        device.output(name=target_name).subscribe(print_output)
         glove.start()
         glove.run_background()
         print(
@@ -111,6 +135,12 @@ def main() -> None:
             flush=True,
         )
         time.sleep(options.seconds)
+        if options.key_output:
+            saved = device.export_calibration(options.key_output, target_name)
+            print(
+                f"effective calibration key saved: {saved['path']} sha256={saved['key_sha256']}",
+                flush=True,
+            )
         glove.request_stop()
         glove.join()
     finally:

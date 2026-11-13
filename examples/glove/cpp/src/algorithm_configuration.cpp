@@ -15,12 +15,16 @@ int main(int argc, char** argv) {
         std::optional<qnbot::Side> side;
         std::string package_id;
         std::string operator_id = "default";
+        std::optional<std::string> source_name;
         bool prepare_bone_config = false;
         bool replace_bone_config = false;
         std::optional<std::string> bone_config_file;
         auto bone_usage = qnbot::BoneConfigUsage::auto_detect;
         std::string bone_option = "auto";
         std::optional<std::string> algorithm_config_path;
+        std::optional<std::string> calibration_key;
+        std::optional<std::string> target_name;
+        std::optional<std::string> key_output;
         double seconds = 10.0;
         for (int index = 1; index < argc; ++index) {
             const std::string argument = argv[index];
@@ -40,12 +44,20 @@ int main(int argc, char** argv) {
                 side = example::parse_side(value);
             else if (argument == "--package-id")
                 package_id = value;
+            else if (argument == "--source-name")
+                source_name = value;
             else if (argument == "--operator-id")
                 operator_id = value;
             else if (argument == "--bone-config-file")
                 bone_config_file = value;
             else if (argument == "--algorithm-config-path")
                 algorithm_config_path = value;
+            else if (argument == "--calibration-key")
+                calibration_key = value;
+            else if (argument == "--target-name")
+                target_name = value;
+            else if (argument == "--key-output")
+                key_output = value;
             else if (argument == "--seconds")
                 seconds = example::parse_positive_double(value, argument);
             else if (argument == "--use-bone-config") {
@@ -98,17 +110,24 @@ int main(int argc, char** argv) {
                 "BoneConfigSession support");
 #endif
         }
-        auto config = example::serial_config(port, *side);
+        qnbot::SerialConnection connection;
+        connection.port = port;
+        qnbot::GloveConfig configured_glove{*side, connection};
+        configured_glove.name = source_name;
+        qnbot::SdkConfig config;
+        config.devices.push_back(configured_glove);
         config.algorithms.capture.operator_id = operator_id;
         qnbot::TargetConfig target;
-        target.name = "configured_hand";
+        if (!calibration_key && !target_name) target_name = "configured_hand";
+        target.name = target_name;
         target.side = *side;
-        target.source = qnbot::DeviceSelector{"glove", std::nullopt, *side};
+        target.source = qnbot::DeviceSelector{"glove", source_name, *side};
         target.algorithms = {
             qnbot::TargetAlgorithm{
                 package_id,
                 bone_usage,
                 algorithm_config_path,
+                calibration_key,
             },
         };
         config.targets.push_back(target);
@@ -116,7 +135,8 @@ int main(int argc, char** argv) {
         auto glove = sdk.glove();
         auto device = glove.device();
         const auto subscription =
-            device.output("configured_hand").subscribe(example::print_output);
+            (target_name ? device.output(*target_name) : device.output())
+                .subscribe(example::print_output);
         glove.start();
         glove.run_background();
         std::cout << "package=" << package_id
@@ -124,6 +144,13 @@ int main(int argc, char** argv) {
                   << " algorithm_config_path="
                   << algorithm_config_path.value_or("(default)") << std::endl;
         std::this_thread::sleep_for(std::chrono::duration<double>(seconds));
+        if (key_output) {
+            const auto saved =
+                device.export_calibration(*key_output, target_name);
+            std::cout << "effective calibration key saved: " << *key_output
+                      << " sha256="
+                      << saved.as_object().at("key_sha256").as_string() << '\n';
+        }
         glove.request_stop();
         glove.join();
         static_cast<void>(subscription);

@@ -12,7 +12,7 @@ def print_pose(sample: Sample[GlovePose]) -> None:
     print(
         f"pose sequence={sample.sequence} source_time_ms={sample.source_time} "
         f"observed_at_ms={sample.observed_at} "
-        f"fingertips={sample.value.payload.fingertip_local}"
+        f"fingertips={(sample.value.payload.hand.fingertips if sample.value.payload.hand else {})}"
     )
 
 

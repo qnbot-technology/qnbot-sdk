@@ -18,7 +18,7 @@ import com.qnbot.examples.QuickStart;
 QuickStart.run(context, transport);
 ```
 
-应持续看到 `left sequence=` 和 `right sequence=` 递增，并带有左右手拇指和食指位置。QuickStart 用 `runForever()` 持续运行，结束后自行关闭设备。把它放在工作线程，不要在 UI 线程直接调用。
+应持续看到 `left sequence=` 和 `right sequence=` 递增，并带有左右手拇指和食指位置。QuickStart 用 `runForever()` 阻塞工作线程，原样调用不提供停止句柄。需要在应用内主动停止时，复制源码并由应用持有 `Sdk`，再从其他线程关闭；原样运行可随进程退出结束。不要在 UI 线程直接调用。
 
 有限运行用例按 `seconds` 自行结束。
 

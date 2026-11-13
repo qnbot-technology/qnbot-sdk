@@ -26,13 +26,13 @@ def main() -> None:
         left_glove_device.pose().subscribe(
             lambda sample: print(
                 f"left glove pose sequence={sample.sequence} "
-                f"fingertips={len(sample.value.payload.fingertip_local)}"
+                f"fingertips={(len(sample.value.payload.hand.fingertips) if sample.value.payload.hand else 0)}"
             )
         )
         right_glove_device.pose().subscribe(
             lambda sample: print(
                 f"right glove pose sequence={sample.sequence} "
-                f"fingertips={len(sample.value.payload.fingertip_local)}"
+                f"fingertips={(len(sample.value.payload.hand.fingertips) if sample.value.payload.hand else 0)}"
             )
         )
         sdk.start()

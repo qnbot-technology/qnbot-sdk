@@ -7,7 +7,7 @@ from qnbot_sdk.glove import GloveConfig, GlovePose
 def print_pose(sample: Sample[GlovePose]) -> None:
     print(
         f"pose sequence={sample.sequence} "
-        f"fingertips={sample.value.payload.fingertip_local}"
+        f"fingertips={(sample.value.payload.hand.fingertips if sample.value.payload.hand else {})}"
     )
 
 
