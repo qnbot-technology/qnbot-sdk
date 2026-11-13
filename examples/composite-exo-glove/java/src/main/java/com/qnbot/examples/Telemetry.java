@@ -42,13 +42,27 @@ public final class Telemetry {
       GloveDevice right = glove.device(Side.RIGHT);
       ExoDevice exoDevice = exo.device();
       left.pose().subscribe(sample
-          -> System.out.println("left sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
+          -> System.out.println("left sequence=" + sample.sequence + " thumb="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.THUMB)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.THUMB).position)
+              + " index="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.INDEX)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.INDEX).position)));
       right.pose().subscribe(sample
-          -> System.out.println("right sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
+          -> System.out.println("right sequence=" + sample.sequence + " thumb="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.THUMB)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.THUMB).position)
+              + " index="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.INDEX)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.INDEX).position)));
       exoDevice.telemetry().subscribe(sample
           -> System.out.println("telemetry sequence=" + sample.sequence
               + " leftEncoders=" + sample.value.payload.leftArm.encoderCounts

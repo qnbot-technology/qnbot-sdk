@@ -34,12 +34,28 @@ public final class QuickStart {
       GloveDevice left = glove.device(Side.LEFT);
       GloveDevice right = glove.device(Side.RIGHT);
       // Subscribe before start so the first samples of both gloves are observed.
-      left.pose().subscribe(sample -> System.out.println("left sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
-      right.pose().subscribe(sample -> System.out.println("right sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
+      left.pose().subscribe(sample
+          -> System.out.println("left sequence=" + sample.sequence + " thumb="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.THUMB)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.THUMB).position)
+              + " index="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.INDEX)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.INDEX).position)));
+      right.pose().subscribe(sample
+          -> System.out.println("right sequence=" + sample.sequence + " thumb="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.THUMB)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.THUMB).position)
+              + " index="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.INDEX)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.INDEX).position)));
       // The root Sdk starts both glove members and the Exo over their shared serial link.
       sdk.start();
       sdk.runForever();

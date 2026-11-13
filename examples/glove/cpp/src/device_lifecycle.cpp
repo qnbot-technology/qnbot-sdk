@@ -56,8 +56,10 @@ Options parse_options(int argc, char** argv) {
 
 void print_pose(const char* name,
                 const qnbot::Sample<qnbot::GlovePose>& sample) {
-    std::cout << name << " pose sequence=" << sample.sequence
-              << " fingertips=" << sample.value.payload.fingertip_local.size()
+    std::cout << name << " pose sequence=" << sample.sequence << " fingertips="
+              << (sample.value.payload.hand
+                      ? sample.value.payload.hand->fingertips.size()
+                      : 0)
               << '\n';
 }
 

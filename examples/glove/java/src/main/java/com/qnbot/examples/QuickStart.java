@@ -22,9 +22,17 @@ public final class QuickStart {
     SdkConfig config = SdkConfig.builder().device(GloveConfig.builder().build()).build();
     try (Sdk sdk = new Sdk(config, context, transport); Glove glove = sdk.glove()) {
       GloveDevice device = glove.device();
-      device.pose().subscribe(sample -> System.out.println("pose sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
+      device.pose().subscribe(sample
+          -> System.out.println("pose sequence=" + sample.sequence + " thumb="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.THUMB)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.THUMB).position)
+              + " index="
+              + (sample.value.payload.hand == null
+                          || !sample.value.payload.hand.fingertips.containsKey(GloveFinger.INDEX)
+                      ? "absent"
+                      : sample.value.payload.hand.fingertips.get(GloveFinger.INDEX).position)));
       glove.start();
       System.out.println("running");
       glove.runForever();

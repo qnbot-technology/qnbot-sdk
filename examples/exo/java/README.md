@@ -18,7 +18,7 @@ import com.qnbot.examples.QuickStart;
 QuickStart.run(context, transport);
 ```
 
-应持续看到 `telemetry sequence=` 递增，并带有左右编码器和关节弧度。QuickStart 用 `runForever()` 阻塞工作线程，不自行返回；示例不内置停止按钮，需要主动停止时从其他线程关闭 `Sdk` 或结束进程。不要在 UI 线程直接调用。
+应持续看到 `telemetry sequence=` 递增，并带有左右编码器和关节弧度。QuickStart 用 `runForever()` 阻塞工作线程，原样调用不提供停止句柄。需要在应用内主动停止时，复制源码并由应用持有 `Sdk`，再从其他线程关闭；原样运行可随进程退出结束。不要在 UI 线程直接调用。
 
 有限运行用例按 `seconds` 自行结束。
 
