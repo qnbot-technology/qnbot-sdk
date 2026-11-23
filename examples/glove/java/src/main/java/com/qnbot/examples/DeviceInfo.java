@@ -36,11 +36,11 @@ public final class DeviceInfo {
       GloveDeviceInfo info = device.getDeviceInfo();
       System.out.println("source=" + device.sourceId()
           + " canonical_sn=" + info.canonicalSn
-          + " device_type=" + (info.deviceType == null ? "unknown" : info.deviceType)
-          + " model=" + (info.model == null ? "unknown" : info.model)
-          + " firmware_version=" + (info.firmwareVersion.isEmpty() ? "unknown" : info.firmwareVersion)
+          + " device_type=" + info.deviceType
+          + " model=" + info.model
+          + " firmware_version=" + info.firmwareVersion
           + " hand=" + info.hand.wireValue()
-          + " hand_source=" + (info.handSource == null ? "unknown" : info.handSource)
+          + " hand_source=" + info.handSource
           + " transport_type=" + info.transportType.name().toLowerCase(Locale.ROOT));
     }
   }

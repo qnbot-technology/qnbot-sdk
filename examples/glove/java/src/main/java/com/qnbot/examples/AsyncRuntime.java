@@ -16,7 +16,6 @@ import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 import com.qnbot.sdk.glove.HandJointCommand;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -31,16 +30,16 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class AsyncRuntime {
   private AsyncRuntime() {}
 
-  /** Waits for either side; a failed runner stays the primary error. */
-  private static void await(CompletableFuture<?> result, CompletableFuture<Void> runner)
+  private static <T> T await(CompletableFuture<T> result, CompletableFuture<Void> runner)
       throws Exception {
-    try {
-      CompletableFuture.anyOf(result, runner).get();
-    } catch (ExecutionException error) {
-      if (runner.isCompletedExceptionally())
-        runner.get();
-      throw error;
-    }
+    CompletableFuture.anyOf(result, runner).get();
+    if (runner.isCompletedExceptionally())
+      runner.get();
+    if (result.isCompletedExceptionally())
+      result.get();
+    if (!result.isDone())
+      throw new IllegalStateException("background run ended before output");
+    return result.get();
   }
 
   public static void run(Context context, SerialTransport transport, String port, Side side,
@@ -105,23 +104,11 @@ public final class AsyncRuntime {
       CompletableFuture<Void> runner = CompletableFuture.runAsync(glove::join);
       CompletableFuture<Sample<HandJointCommand>> next = output.next().toCompletableFuture();
       try {
-        await(next, runner);
-        if (runner.isCompletedExceptionally())
-          runner.get();
-        if (!next.isDone())
-          throw new IllegalStateException("Background run ended before the first output sample");
-        Sample<HandJointCommand> first = next.get();
+        Sample<HandJointCommand> first = await(next, runner);
         System.out.println("next retargeting sequence=" + first.sequence
             + " target=" + first.value.target + " joints=" + first.value.joints);
-
         output.publisher().subscribe(subscriber);
         await(streamed, runner);
-        if (runner.isCompletedExceptionally())
-          runner.get();
-        if (!streamed.isDone())
-          throw new IllegalStateException(
-              "Background run ended before output consumption finished");
-        streamed.get();
       } finally {
         next.cancel(false);
         Flow.Subscription subscription = active.get();

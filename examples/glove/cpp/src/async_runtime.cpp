@@ -4,7 +4,7 @@
 #include "example_support.hpp"
 
 #include <cstdlib>
-#include <exception>
+#include <chrono>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -25,32 +25,25 @@ struct Options {
 Options parse_options(int argc, char** argv) {
     Options options;
     for (int index = 1; index < argc; ++index) {
-        const std::string argument = argv[index];
-        if (argument == "--port") {
-            options.port = example::require_value(argc, argv, index, argument);
-        } else if (argument == "--side") {
-            options.side = example::parse_side(
-                example::require_value(argc, argv, index, argument));
-        } else if (argument == "--samples") {
-            options.samples = example::parse_positive_count(
-                example::require_value(argc, argv, index, argument), argument);
-        } else if (argument == "--package-id") {
-            options.package_id =
-                example::require_value(argc, argv, index, argument);
-        } else {
-            throw std::invalid_argument("unknown argument: " + argument);
-        }
+        const auto [option, value] = example::next_argument(argc, argv, index);
+        if (option == "--port")
+            options.port = value;
+        else if (option == "--side")
+            options.side = example::parse_side(value);
+        else if (option == "--samples")
+            options.samples = example::parse_positive_count(value, option);
+        else if (option == "--package-id")
+            options.package_id = value;
+        else
+            throw std::invalid_argument("unknown argument: " + option);
     }
     if (options.port.empty()) throw std::invalid_argument("--port is required");
-    if (!options.side) {
+    if (!options.side)
         throw std::invalid_argument("--side is required with --port");
-    }
-    if (options.package_id.empty()) {
+    if (options.package_id.empty())
         throw std::invalid_argument("--package-id is required");
-    }
     return options;
 }
-
 example::Task<qnbot::Sample<qnbot::HandJointCommand>>
 wait_for_output(qnbot::ReadChannel<qnbot::HandJointCommand> channel,
                 std::shared_ptr<qnbot::coro::DeferredExecutor> executor,
@@ -100,6 +93,7 @@ int main(int argc, char** argv) {
             pending_stop.request_stop();
         });
 
+        std::exception_ptr consume_failure;
         try {
             for (std::uint64_t index = 0; index < options.samples; ++index) {
                 auto pending =
@@ -107,15 +101,19 @@ int main(int argc, char** argv) {
                 example::print_output(pending.get());
             }
         } catch (...) {
-            if (!pending_stop.stop_requested()) glove.request_stop();
-            observer.join();
-            glove.close();
-            throw;
+            consume_failure = std::current_exception();
         }
-        if (!pending_stop.stop_requested()) glove.request_stop();
+        try {
+            if (!pending_stop.stop_requested()) glove.request_stop();
+        } catch (const qnbot::LifecycleError&) {
+            // The runner can finish before the stop request reaches it.
+        } catch (const qnbot::ClosedHandleError&) {
+            // The handle can close while output consumption is pending.
+        }
         observer.join();
         glove.close();
         if (join_failure) std::rethrow_exception(join_failure);
+        if (consume_failure) std::rethrow_exception(consume_failure);
         std::cout << "async runtime complete\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {

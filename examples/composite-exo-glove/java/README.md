@@ -4,8 +4,8 @@
 
 ## 准备
 
-1. 取得支持统一 `Sdk` 入口的完整配套 Android Maven 交付，按交付清单校验并解压，保留完整 `maven/`。RC/Stable 也可从 [SDK 发布列表](https://github.com/qnbot-technology/qnbot-sdk/releases) 选择；版本以实际交付记录为准。统一入口的首个发布版本尚未确定，使用明确提供该入口的配套组件版本。
-2. 准备 Android API 26 或以上的 `arm64-v8a` 运行环境。现有 Java SDK 需要真实 Android `Context`；当前不提供桌面 JVM 或 x86 运行包。
+1. 取得支持统一 `Sdk` 入口的完整配套 Android Maven 交付，按交付清单校验并解压，保留完整 `maven/`。正式版可从 [SDK 发布列表](https://github.com/qnbot-technology/qnbot-sdk/releases) 选择；使用交付记录中的 Exo `1.6.0`、Glove `2.0.0` 或后续正式版。
+2. 准备 Android API 26 或以上的 `arm64-v8a` 运行环境。现有 Java SDK 需要真实 Android `Context`。
 3. 在自己的项目中接入对应 SDK 组件并启用标准 core library desugaring。USB 输入先由自己的应用取得权限，准备支持的 `SerialTransport`；内置 `UsbSerialTransport` 支持 USB Host 上的单串口 CDC ACM 设备。
 
 ## 先读取数据
@@ -18,7 +18,7 @@ import com.qnbot.examples.QuickStart;
 QuickStart.run(context, transport);
 ```
 
-应持续看到 `left sequence=` 和 `right sequence=` 递增，并带有左右手拇指和食指位置。QuickStart 用 `runForever()` 持续运行，结束后自行关闭设备。把它放在工作线程，不要在 UI 线程直接调用。
+应持续看到 `left sequence=` 和 `right sequence=` 递增，并带有左右手拇指和食指位置。QuickStart 用 `runForever()` 阻塞工作线程，原样调用不提供停止句柄。需要在应用内主动停止时，复制源码并由应用持有 `Sdk`，再从其他线程关闭；原样运行可随进程退出结束。不要在 UI 线程直接调用。
 
 有限运行用例按 `seconds` 自行结束。
 

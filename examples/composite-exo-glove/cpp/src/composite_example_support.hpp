@@ -27,15 +27,23 @@ inline std::string require_value(int argc, char** argv, int& index,
     return value;
 }
 
+struct Argument {
+    std::string name;
+    std::string value;
+};
+
+inline Argument next_argument(int argc, char** argv, int& index) {
+    const std::string name = argv[index];
+    return Argument{name, require_value(argc, argv, index, name)};
+}
+
 inline std::string parse_port(int argc, char** argv) {
     std::string port;
     for (int index = 1; index < argc; ++index) {
-        const std::string argument = argv[index];
-        if (argument == "--port") {
-            port = require_value(argc, argv, index, argument);
-        } else {
-            throw std::invalid_argument("unknown argument: " + argument);
-        }
+        const auto [option, value] = next_argument(argc, argv, index);
+        if (option != "--port")
+            throw std::invalid_argument("unknown argument: " + option);
+        port = value;
     }
     if (port.empty()) throw std::invalid_argument("--port is required");
     return port;

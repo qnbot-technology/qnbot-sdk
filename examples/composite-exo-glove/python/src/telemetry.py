@@ -14,9 +14,10 @@ from qnbot_sdk.glove import GloveConfig, GlovePose, GloveStatus
 
 
 def print_glove(label: str, sample: Sample[GlovePose]) -> None:
+    hand = sample.value.payload.hand
     print(
         f"{label} glove pose sequence={sample.sequence} "
-        f"hand={sample.value.payload.hand_side}"
+        f"hand={hand.hand_side if hand is not None else 'unavailable'}"
     )
 
 

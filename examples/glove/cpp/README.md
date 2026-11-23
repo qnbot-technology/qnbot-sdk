@@ -56,8 +56,7 @@ cmake --build build --config Release
 
 `device_selection` 使用 Glove **1.5.0** 及配套 Core **1.5.0** 交付包。
 请通过产品交付渠道获取与平台匹配的版本；不要将不同版本的头文件和库混用。
-1.4.0 不支持本示例使用的名称与左右手联合选择。使用 1.4.0 时构建会跳过此示例和两个配置示例，
-其他示例仍按上面的步骤构建。取得兼容交付包后，单独构建并运行：
+取得兼容交付包后，单独构建并运行：
 
 ```bash
 cmake -S . -B build-selection -G Ninja \
@@ -98,7 +97,8 @@ cmake --build build-selection --config Release --target device_selection
 | `algorithm_configuration` | C++17 | 是 | 是 | 使用已有骨长配置和算法参数覆盖文件 |
 | `quick_start` | C++17 | 是 | 否 | 零参数读取单只手套姿态 |
 | `time_sync` | C++17 | 是 | 否 | 在后台运行并定期使用外部时间源提供的 Unix 毫秒时间同步 Glove 时钟后读取姿态 |
-| `imu` | C++17 | 是 | 否 | 读取有线或兼容无线手套的 IMU 原始计数 |
+| `imu` | C++17 | 是 | 否 | 读取手套的带单位 IMU 数据 |
+| `emf` | C++17 | 是，支持 EMF 的手套 | 否 | 读取与 pose 配对的原始 EMF 矩阵和实际通道信息 |
 | `manual_runtime` | C++17 | 是 | 是 | 由应用控制每次更新 |
 | `foreground_runtime` | C++17 | 是 | 是 | 在当前线程持续运行 |
 | `background_runtime` | C++17 | 是 | 是 | 在后台运行并主动停止 |
@@ -108,40 +108,10 @@ cmake --build build-selection --config Release --target device_selection
 | `device_lifecycle` | C++17 | 是，两只 | 否 | 多只手套的独立启停：停止、重启其中一只，其他手套继续输出 |
 | `haptics` | C++17 | 是 | 否 | 设置并清除触觉反馈 |
 | `host_capture_calibration` | C++17 | 是，两只 | 否，可选目标包 | 完成左右手采集并保存、应用标定结果 |
+| `capture_quality` | C++17 | 是 | 否 | 使用配套开发包独立检查当前动作 |
+| `pressure` | C++17 | 是，HMP-MX | 否 | 读取整帧压力摘要和所选点 |
 
-两个 external input 示例都需要显式提供 `--package-id`，默认由 SDK 在可交互终端提示并接收采集确认（`auto_terminal`）。
-后台示例启动后会返回并继续推帧，**返回不代表标定完成**；按终端提示完成动作期间也要持续提供帧，
-完成标定后才会出现目标手输出。手动更新示例由应用循环持续推帧并更新，仍可使用 SDK 的自动终端引导。
-需要由应用处理提示和确认时，添加 `--capture-interaction external`；该选项不会代替应用供帧。
-使用算法包的示例必须显式传入 `--package-id`，两个 external input 示例也不例外。
-
-手动更新示例会等待每次更新完成，再读取当前输出。
-
-手动更新示例不会用 `has_next_task` 判断是否需要等待：`update()` 之后直接调用 `update.sleep()`；在 `update.sleep()` 返回 `no_tasks`、没有可等待的工作时，示例会短暂让出（10 毫秒）以避免忙轮询，然后继续下一轮 `update()`。外部输入示例在 `update()` 之前先 `push_frame()`，因此不会在应用还欠下一帧输入时阻塞。
-
-当手套帧由应用提供时（两个 external input 示例），`update()` 之后调用 `sleep()` 可能在应用尚未提供下一帧时就返回 `qnbot::SleepResult::no_tasks`：此时仍有进行中的采集或标定阶段需要应用自己推送的下一帧，SDK 无法代替应用推进。应用循环必须处理该返回值（示例中短暂休眠后再推送下一帧），不能假设 `sleep()` 一定阻塞，也不能用 `update.has_next_task` 作为是否调用 `sleep()` 的门禁。
-
-输入快于算法处理能力时，目标手输出按最新状态收敛：过载不会持续积压，也不会逐帧交付每一个中间结果。SDK 默认不限制推进频率或 CPU 占用，推进速度由输入到达和算法处理能力决定；需要限制节奏时由应用自己的循环控制 `update()` 的调用频率。
-
-## 标定策略
-
-普通示例（`quick_start`、`foreground_runtime`、`background_runtime`、`async_runtime`、
-`manual_runtime` 以及 `multiple_outputs`、`debug_trace`）使用默认的自动标定。
-`glove.start()` 不传参数时，SDK 会在首次推进（`update()`、`run_forever()` 或
-`run_background()`）时自动完成所需的采集与标定，并在需要用户操作时给出终端提示；这些
-示例不调用 `start_capture` 或 `start_calibration`。`manual_runtime` 里的“手动”只表示由应用
-控制每次更新，标定仍由 SDK 自动组织。
-
-需要完全不标定的原始数据流程时，显式选择 `qnbot::CalibrationMode::none`，例如
-`device.start(qnbot::CalibrationMode::none)` 或 `glove.start(qnbot::CalibrationMode::none)`：
-它允许原始 `start_capture`，但会拒绝标定以及需要标定的目标输出。不加载算法包、也不创建
-标定的示例（`discover_gloves`、`skeleton`、`imu`、`haptics`）使用默认策略运行即可。
-
-`host_capture_calibration` 演示由上位机显式控制同一流程，启动顺序为：`glove.start()`、
-`device.start(qnbot::CalibrationMode::manual)`、`start_capture`、`start_calibration`。对每个
-要手动管理的设备都选择 `qnbot::CalibrationMode::manual`，其余设备保持默认策略。未启动设备
-就调用 `start_capture` 的旧顺序会失败，并提示先启动设备；SDK 不会替应用启动硬件或改变已
-选择的标定策略。
+两个 external input 示例都需要显式提供 `--package-id`，并在终端提示期间持续推帧；需要应用接管提示时加 `--capture-interaction external`。
 
 ## 常用命令
 
@@ -203,164 +173,46 @@ cmake --build build-selection --config Release --target device_selection
 
 使用多配置生成器时，将命令中的 `./build/` 替换为 `./build/Release/`。
 
-## 参数说明
+## 参数与配置
 
-- `--port`：手套串口；使用 `--port` 的参数化示例必须显式提供串口。
-- `--side`：手套物理侧，取值为 `left` 或 `right`。
-- `--package-id`：已经安装的目标手算法包 ID；该参数不会安装算法包。`host_capture_calibration` 不传此参数时使用内置骨骼，其他需要目标包的示例仍须显式提供。
-- `--capture-interaction`：两个外部输入示例的交互方式，默认 `auto_terminal`；自带界面或无交互终端时选择 `external`。
-- `--force`：`host_capture_calibration` 忽略可复用采集并重新采集。
-- `--detail`、`--sample-rate`：控制 `debug_trace` 的诊断日志详细程度和采样率。
-
-`debug_trace` 生成的诊断日志固定写入 `<QNBOT_SDK_HOME>/logs`。如需自定义 SDK 数据根目录，优先设置 `QNBOT_SDK_HOME`；旧变量 `QNBOT_HOME` 仍兼容。
-
-缺少标定时按终端提示操作，完成后示例会开始输出目标关节结果。
-
-以下八手势池流程适用于包含该更新的 SDK。当前安装示例指定的 1.5.0 不包含此更新，其动作仍由算法包声明；首个包含八手势池的发布版本尚未确定。
-
-首次按提示完成八个动作，每个动作保持到采满 30 帧：五指自然并拢、五指自然张开、四指根关节弯曲约 90 度、自然握拳，以及拇指分别与食指、中指、无名指、小指指腹轻触。八步全部完成后保存采集。
-
-同一操作者、手套和手侧下，再次运行或切换目标包会复用兼容采集，不重复摆已采动作；新目标仍会计算自己的标定结果。使用 `--force` 才重新采集全部八步。升级前保存的采集若不兼容，程序会重新请求这八步；完成一次后恢复正常复用。`host_capture_calibration` 示例逐个确认计划中的动作。
-
-包含步骤选择更新的 SDK 支持在该示例的等待确认提示中输入 `stage <stage_id>`，例如 `stage pinch_little`。步骤 ID 和当前状态会列在提示上方；可选择待采动作或重采已完成动作，按 Enter 确认采集，输入 `n` 取消。跳转不算采集完成，重采会替换该动作的数据；其他已完成动作保留，全部必采动作仍需采齐。首次包含此更新的发布版本未定，使用这项交互前升级到包含该更新的匹配 SDK。
-
-完整复用当前采集数据时，已有的兼容标定结果保持不变。包含取消结果修复的 SDK 在标定会话被取消后丢弃本次新结果，保留上一份兼容的有效标定；没有旧结果时，下次运行仍需完成标定。首个包含该修复的发布版本尚未确定，Core/Glove 1.5.0 仍可能保留已取消会话的新结果。
-使用 `--force` 成功完成新采集后，需要基于新数据完成标定才能恢复目标输出。
-
-使用自动终端提示的示例默认跟随系统语言。运行前设置 `QNBOT_SDK_LANGUAGE=en` 可选择英文，
-设置 `QNBOT_SDK_LANGUAGE=zh` 可选择中文；英文提示缺失时显示原始提示。手动展示采集进度的
-示例会优先显示英文提示，缺失时使用原始提示。
-
-当 SDK 能将该端口识别为受支持的有线直连手套，且同时显式提供 `--port`（配置字段
-`port`）和 `--side`（配置字段 `side`）时，无法报告设备身份的旧版有线直连手套仍可
-连接，并发出“身份未验证”告警。断线恢复只重试该串口，不能确认仍是同一只物理手套。
-自动发现、只提供其中一个参数、按 `serial_number` 选择、无线 Receiver 以及
-无法识别端口类型时仍要求设备身份校验。
-
-`skeleton` 在 SDK 创建后、`start()` 前配置 Skeleton；启动前重复配置是幂等的。
-
-在 macOS 上，首次请求 Skeleton 可能需要一次性准备时间；请像示例一样在启动设备前完成，
-再进入需要及时响应的循环。仅做设备选择或读取原始姿态时无需请求 Skeleton。
-
-`imu` 需要一只提供 IMU 的手套，不需要目标手算法包。程序持续输出 `source`、`sequence`、`valid`、`gyroscope_raw` 和 `accelerometer_raw`；`valid=false` 时仍输出原始计数，按 `Ctrl+C` 停止。启动成功后仍须等待第一条有效样本。
-
-### 无线 IMU（待发布）
-
-无线 IMU 需要包含此功能的 SDK 和支持同手姿态/IMU 组合输出的配套手套、Receiver 固件；首个 SDK 发布版本未定，1.7.0 不支持。安装产品交付说明指定的匹配版本后，将端口替换为 Receiver 端口，并选择在线手套：
-
-```bash
-./build/imu --port /dev/ttyACM0 --side left
-```
-
-预期持续输出所选手套的 IMU 原始计数。没有 IMU 输出时，确认固件支持组合输出、所选手套在线，并检查启动错误；只有姿态的设备不会产生 IMU。不要同时运行多个示例进程争用同一 Receiver 端口。
-
-### 触觉ENF定位手套（VetraGlove HMP-MX）
-
-安装同一版本且支持触觉ENF定位手套的 Core 和 Glove SDK。连接一只按出厂设置主动上报压感的 VetraGlove HMP-MX 手套，在交互式终端运行，并将示例端口替换为实际串口。
-
-**460 点压感是 HMP-MX 独有的通道：只有这只手套提供 `pressure()`，Nano、Pro 和 Receiver 手套没有该通道。**
-
-```bash
-cmake -S . -B build-pressure -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_PREFIX_PATH=/path/to/qnbot \
-  -DQNBOT_BUILD_PRESSURE_EXAMPLE=ON
-cmake --build build-pressure --config Release --target pressure
-./build-pressure/pressure --port /dev/ttyACM0
-```
-
-程序只订阅压感，每秒输出一帧 `pressure`：`points=460` 为测点总数，`first_raw` 为首点原始值，读数范围为 0–255。未上报压感时没有新样本。按 `Ctrl+C` 停止。姿态、IMU 和 Skeleton 使用对应的通用示例。
-
-## 订阅交付配置
-
-`subscription_config` 默认以最新值模式读取姿态，最高每秒交付 30 次，运行 10 秒后停止。无需算法包。
-
-```bash
-./build/subscription_config --port /dev/ttyUSB0 --side left
-./build/subscription_config --port /dev/ttyUSB0 --side left --mode fifo --capacity 128 --max-rate-hz 30 --seconds 10
-```
-
-- `--mode latest`：处理不及时只保留最新待处理值，适合界面显示。
-- `--mode fifo`：按顺序交付，最多保留 `--capacity` 个待处理值；满时丢弃最旧值，不保证每帧都交付。
-- `--max-rate-hz`：最高交付频率，默认 `30`；不会改变算法计算频率。
-- `--seconds`：后台运行秒数，默认 `10`。
-
-程序结束时输出 `samples`（接收数）、`observed_hz`（首末样本之间的平均交付频率）和 `last_sequence`，随后输出 `subscription complete`。回调只记录计数和时间；最新值模式下序号可能跳跃。至少收到两条样本才计算频率，否则显示 `0`。实际频率还取决于输入速度、处理耗时和系统调度；单帧间隔会随调度抖动变化，不能把配置理解为每帧严格等间隔。
-
-## 骨长与算法参数配置
-
-`algorithm_configuration` 将已有骨长配置的使用策略与算法参数覆盖文件放在同一示例中。
-先通过 QnBot CLI 安装产品交付的兼容算法包；准备骨长配置及覆盖文件时遵循该算法包的产品说明。
-该示例默认使用已有配置，也可显式选择扫码准备或导入网页下载的单手配置；准备成功后再创建 SDK。新增准备选项需要包含 `BoneConfigSession` 接口的配套 SDK 安装包。
-
-```bash
-./build/algorithm_configuration --port /dev/ttyUSB0 --side left --package-id '<package-id>' --use-bone-config false
-./build/algorithm_configuration --port /dev/ttyUSB0 --side left --package-id '<package-id>' --operator-id default --use-bone-config true --algorithm-config-path config/override.yaml
-```
-
-- `--use-bone-config auto`：默认值，存在对应操作者、手侧的骨长配置时使用，否则采用算法默认值。
-- `--use-bone-config true`：要求对应配置存在且有效；`false` 忽略该配置。
-- `--operator-id`：骨长配置对应的操作者，默认 `default`；无需指定配置安装目录。
-- `--algorithm-config-path`：可选的算法参数覆盖文件，相对路径从程序启动目录解析；字段按算法包说明填写。省略时使用算法默认参数。
-- `--seconds`：启动及所需自动标定完成后的读取秒数，默认 `10`。
-
-
-需要先测量时，按 [标定网页](https://calibrator.qnbot.com) 的要求准备 A4 标定板，在原命令中增加 `--prepare-bone-config`：
-
-```sh
-./build/algorithm_configuration --port /dev/ttyUSB0 --side left --package-id '<package-id>' --operator-id default --use-bone-config true --prepare-bone-config
-```
-
-程序显示二维码或链接；手机完成指定手侧测量后，电脑输出安装路径并继续运行。会话有效期为 15 分钟，到期后重新运行命令。也可以在网页下载“上位机配置 YAML”并导入：
-
-```sh
-./build/algorithm_configuration --port /dev/ttyUSB0 --side left --package-id '<package-id>' --operator-id default --use-bone-config true --bone-config-file /path/to/left.yaml
-```
-
-`--prepare-bone-config` 与 `--bone-config-file` 二选一；“详细 YAML”不能作为配置导入。已有配置默认保留，确认要替换时增加 `--replace-bone-config`。准备失败时程序不会继续创建 SDK。取消时按终端提示操作；若已经显示配置安装成功，清理未确认不影响已保存的配置。
-
-缺少动作采集时按终端提示操作，完成后输出目标关节数据。骨长配置不等同于该动作采集与标定流程。
-配置文件修改后重新运行示例；是否需要重新标定以算法包说明为准。要求使用配置却找不到文件时，先确认操作者及手侧与准备的配置一致。
-
-配置示例正常结束时分别输出 `subscription complete` 和 `algorithm configuration complete`。
-完整配置说明见[权威 SDK 指南](https://docs.qnbot.com/zh-CN/docs/vetra-glove-pro/sdk/cpp/latest/configuration-reference)。
-
-`time_sync` 同时输出 `source_time_ms` 和 `observed_at_ms`：
-前者反映数据源时间，后者用于观察 SDK 接收的先后，不能直接把两个不同时间基准相减。
+常用命令见上文。参数含义、订阅交付配置、骨长与算法参数配置见[C++ SDK 配置参考](https://docs.qnbot.com/zh-CN/docs/vetra-glove-pro/sdk/cpp/latest/configuration-reference)。
+需要目标手输出时，先安装配套算法包；缺少标定时按终端提示完成动作，完成后开始输出目标关节结果。
 
 ## 常见问题
 
-- CMake 找不到 `qnbot_glove`：确认 `CMAKE_PREFIX_PATH` 指向解压后的匹配 SDK 包。
-- 找不到手套：确认设备已连接、串口未被其他程序占用，并运行 `discover_gloves`。
-- 找不到算法包：通过 CLI 安装正确的产品算法包，并检查 `--package-id`。
-- 没有目标手输出：确认已完成终端提示的标定；外部输入示例在标定期间也要持续推帧。
-- 后台自动引导启动报终端错误：在可交互终端运行，或选择 `--capture-interaction external`。
-- 采集被取消或采集/标定失败：示例会报告错误并清理资源，不会继续等待目标输出；保留完整错误信息后排查。
-- 没有 IMU 输出：确认使用支持有线 IMU 的 USB 直连手套，并在 `start()` 后等待第一条有效帧。
-
-仍无法解决时，请保留构建命令、运行命令和完整错误信息并联系 QnBot 对接人员。
+- CMake 找不到 `qnbot_glove`：确认 `CMAKE_PREFIX_PATH` 指向匹配的 SDK 包。
+- 找不到手套：确认设备连接、串口未被占用，先运行 `discover_gloves`。
+- 找不到算法包：通过 CLI 安装匹配的产品算法包，并检查 `--package-id`。
+- 没有目标手输出：按终端提示完成标定；外部输入示例在标定期间持续推帧。
+- 终端提示不可用：在交互式终端运行，或选择 `--capture-interaction external`。
 
 ## 有线和无线共用示例
 
-以下示例使用同一套配置，支持 USB 直连、Receiver 无线连接以及左右手混合连接。
-连接 Receiver 时，打开本次使用的手套。只读取一只手时，无需另一只手在线。
-
-查看可用设备及连接类型：
+USB 直连、Receiver 无线和左右手混合连接使用同一套配置。查看设备：
 
 ```bash
 ./build/discover_gloves
-```
-
-读取指定手套的设备信息（无需算法包或启动数据流）：
-
-```bash
 ./build/device_info --side left
 ./build/device_info --side right
-./build/device_info --port <port> --side left
 ```
 
-只连接一只手套时可省略参数；有多个同侧手套时用 `--port` 明确串口。
-输出 SN、手别、型号、固件及 `transport_type`。有线为 `serial`，无线手套为 `receiver_peer`；
-设备未提供的字段显示 `unknown`。
+`device_info` 输出 SN、手别、型号、固件和 `transport_type`；`device_lifecycle` 演示两只手套独立启停，参数见上面的常用命令。
 
-`device_lifecycle` 无需算法包，依次展示双手输出、停止右手时左手继续输出、重启右手后恢复输出。省略串口参数时自动发现；两只手套使用同一 Receiver 时，`--left-port` 和 `--right-port` 可以填写同一串口。
+## 多路 IMU 与原始 EMF
+
+使用 Glove 2.0.0 及后续正式版的配套 Core、Glove 包。IMU 示例输出逐通道原始值或带单位值；`emf` 输出原始 EMF 矩阵和通道信息。
+
+```bash
+./build/imu --port /dev/your-glove --side left
+./build/emf --port /dev/your-glove --side right
+```
+
+## 独立动作质量检查
+
+安装 Glove 2.0.0 及后续正式版的配套 Core、Glove 包，连接手套或 Receiver 后运行：
+
+```bash
+./build/capture_quality --port /dev/your-glove --side left --stage open
+```
+
+`--stage` 支持 close、open、mcp90、mcp90_pip90、pinch_first、pinch_middle、pinch_ring、pinch_little，默认 open。按提示先完成 close，再完成所选动作；程序收齐 30 帧后输出 `accepted`、建议及中英文原因。

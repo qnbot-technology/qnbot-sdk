@@ -58,25 +58,6 @@ async def run(options: argparse.Namespace) -> None:
             if received >= options.samples:
                 break
 
-    async def finish() -> None:
-        if consumer is not None:
-            consumer.cancel()
-            await asyncio.gather(consumer, return_exceptions=True)
-        try:
-            if runner is not None:
-                if not runner.done():
-                    try:
-                        glove.request_stop()
-                    except (LifecycleError, ClosedHandleError):
-                        # The runner or its owner can finish before this call.
-                        pass
-                await runner
-        finally:
-            try:
-                await asyncio.to_thread(glove.close)
-            finally:
-                await asyncio.to_thread(sdk.close)
-
     failure: BaseException | None = None
     try:
         glove.start()
@@ -86,34 +67,24 @@ async def run(options: argparse.Namespace) -> None:
         done, _ = await asyncio.wait(
             (runner, consumer), return_when=asyncio.FIRST_COMPLETED
         )
-        if runner in done:
-            await runner
-            if consumer.done():
-                await consumer
-        else:
-            await consumer
-    except BaseException as error:  # noqa: BLE001 - preserve failure through cleanup.
+        await (runner if runner in done else consumer)
+    except BaseException as error:  # noqa: BLE001 - cleanup still has to run.
         failure = error
     finally:
-        cleanup = asyncio.create_task(finish())
-        while not cleanup.done():
-            try:
-                await asyncio.shield(cleanup)
-            except asyncio.CancelledError as error:
-                if failure is None:
-                    failure = error
-            except Exception:  # noqa: BLE001 - inspect the completed cleanup below.
-                break
-        try:
-            cleanup.result()
-        except BaseException as error:  # noqa: BLE001 - retain the primary failure.
-            # A runner failure takes precedence over cancellation of its consumer.
-            if runner is not None and runner.done() and not runner.cancelled():
-                runner_error = runner.exception()
-                if runner_error is not None:
-                    failure = runner_error
-            if failure is None:
-                failure = error
+        if consumer is not None:
+            consumer.cancel()
+        if runner is not None:
+            if not runner.done():
+                try:
+                    glove.request_stop()
+                except (LifecycleError, ClosedHandleError):
+                    # The runner can finish before the stop request arrives.
+                    pass
+            await asyncio.gather(runner, return_exceptions=True)
+        if consumer is not None:
+            await asyncio.gather(consumer, return_exceptions=True)
+        await asyncio.to_thread(glove.close)
+        await asyncio.to_thread(sdk.close)
     if failure is not None:
         raise failure
     print("async stopped")

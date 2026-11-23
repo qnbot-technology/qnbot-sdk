@@ -11,6 +11,7 @@ import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 import com.qnbot.sdk.glove.GloveFinger;
+import com.qnbot.sdk.glove.GloveHandPose;
 
 /**
  * Connects one composite Exo+Glove device and prints the pose of both gloves.
@@ -34,15 +35,19 @@ public final class QuickStart {
       GloveDevice left = glove.device(Side.LEFT);
       GloveDevice right = glove.device(Side.RIGHT);
       // Subscribe before start so the first samples of both gloves are observed.
-      left.pose().subscribe(sample -> System.out.println("left sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
-      right.pose().subscribe(sample -> System.out.println("right sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
+      left.pose().subscribe(
+          sample -> printPose("left", sample.sequence, sample.value.payload.hand));
+      right.pose().subscribe(
+          sample -> printPose("right", sample.sequence, sample.value.payload.hand));
       // The root Sdk starts both glove members and the Exo over their shared serial link.
       sdk.start();
       sdk.runForever();
     }
+  }
+
+  private static void printPose(String label, long sequence, GloveHandPose hand) {
+    System.out.println(label + " sequence=" + sequence
+        + " thumb=" + hand.fingertips.get(GloveFinger.THUMB).position
+        + " index=" + hand.fingertips.get(GloveFinger.INDEX).position);
   }
 }

@@ -7,11 +7,16 @@ from qnbot_sdk.exo import ExoConfig, ExoDeviceInfo
 
 
 def print_info(info: ExoDeviceInfo) -> None:
-    print(
+    identity = (
         f"product={info.product.name} "
         f"protocol={info.protocol_version.major}.{info.protocol_version.minor} "
-        f"firmware={info.firmware} sn={info.serial_number} name={info.hardware_name}"
+        f"firmware={info.firmware}"
     )
+    if info.serial_number is not None:
+        identity += f" sn={info.serial_number}"
+    if info.hardware_name is not None:
+        identity += f" name={info.hardware_name}"
+    print(identity)
     print(
         "components "
         f"encoders={info.components.encoders.available}/"

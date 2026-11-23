@@ -25,35 +25,27 @@ qnbot::DebugDetail parse_detail(const std::string& text) {
 Options parse_options(int argc, char** argv) {
     Options options;
     for (int index = 1; index < argc; ++index) {
-        const std::string argument = argv[index];
-        if (argument == "--port") {
-            options.port = example::require_value(argc, argv, index, argument);
-        } else if (argument == "--side") {
-            options.side = example::parse_side(
-                example::require_value(argc, argv, index, argument));
-        } else if (argument == "--sample-rate") {
-            options.sample_rate =
-                static_cast<std::uint32_t>(example::parse_positive_count(
-                    example::require_value(argc, argv, index, argument),
-                    argument));
-        } else if (argument == "--detail") {
-            options.detail = parse_detail(
-                example::require_value(argc, argv, index, argument));
-        } else if (argument == "--package-id") {
-            options.package_id =
-                example::require_value(argc, argv, index, argument);
-        } else {
-            throw std::invalid_argument("unknown argument: " + argument);
-        }
+        const auto [option, value] = example::next_argument(argc, argv, index);
+        if (option == "--port")
+            options.port = value;
+        else if (option == "--side")
+            options.side = example::parse_side(value);
+        else if (option == "--sample-rate")
+            options.sample_rate = static_cast<std::uint32_t>(
+                example::parse_positive_count(value, option));
+        else if (option == "--detail")
+            options.detail = parse_detail(value);
+        else if (option == "--package-id")
+            options.package_id = value;
+        else
+            throw std::invalid_argument("unknown argument: " + option);
     }
     if (options.port.empty()) throw std::invalid_argument("--port is required");
     if (!options.side) throw std::invalid_argument("--side is required");
-    if (options.package_id.empty()) {
+    if (options.package_id.empty())
         throw std::invalid_argument("--package-id is required");
-    }
     return options;
 }
-
 qnbot::SdkConfig make_config(const Options& options) {
     auto config = example::serial_config(options.port, *options.side);
     qnbot::TargetConfig target;

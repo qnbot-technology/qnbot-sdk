@@ -14,19 +14,16 @@ int main(int argc, char** argv) {
         std::string second_port;
         double seconds = 3.0;
         for (int index = 1; index < argc; ++index) {
-            const std::string argument = argv[index];
-            if (argument == "--first-port") {
-                first_port =
-                    example::require_value(argc, argv, index, argument);
-            } else if (argument == "--second-port") {
-                second_port =
-                    example::require_value(argc, argv, index, argument);
-            } else if (argument == "--seconds") {
-                seconds = example::parse_seconds(
-                    example::require_value(argc, argv, index, argument));
-            } else {
-                throw std::invalid_argument("unknown argument: " + argument);
-            }
+            const auto [option, value] =
+                example::next_argument(argc, argv, index);
+            if (option == "--first-port")
+                first_port = value;
+            else if (option == "--second-port")
+                second_port = value;
+            else if (option == "--seconds")
+                seconds = example::parse_seconds(value);
+            else
+                throw std::invalid_argument("unknown argument: " + option);
         }
         if (first_port.empty() || second_port.empty()) {
             throw std::invalid_argument(

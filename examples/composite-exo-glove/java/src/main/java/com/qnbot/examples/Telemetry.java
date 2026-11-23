@@ -14,6 +14,8 @@ import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 import com.qnbot.sdk.glove.GloveFinger;
+import com.qnbot.sdk.glove.GloveHandPose;
+import com.qnbot.sdk.glove.GloveStatus;
 
 /**
  * Reads combined telemetry from one composite Exo+Glove link: both glove poses, both glove status
@@ -41,26 +43,18 @@ public final class Telemetry {
       GloveDevice left = glove.device(Side.LEFT);
       GloveDevice right = glove.device(Side.RIGHT);
       ExoDevice exoDevice = exo.device();
-      left.pose().subscribe(sample
-          -> System.out.println("left sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
-      right.pose().subscribe(sample
-          -> System.out.println("right sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
+      left.pose().subscribe(
+          sample -> printPose("left", sample.sequence, sample.value.payload.hand));
+      right.pose().subscribe(
+          sample -> printPose("right", sample.sequence, sample.value.payload.hand));
       exoDevice.telemetry().subscribe(sample
           -> System.out.println("telemetry sequence=" + sample.sequence
               + " leftEncoders=" + sample.value.payload.leftArm.encoderCounts
               + " rightEncoders=" + sample.value.payload.rightArm.encoderCounts
               + " leftRadians=" + sample.value.payload.leftArm.jointPositionsRad
               + " rightRadians=" + sample.value.payload.rightArm.jointPositionsRad));
-      left.status().subscribe(sample
-          -> System.out.println(
-              "left connected=" + sample.value.connected + " stale=" + sample.value.stale));
-      right.status().subscribe(sample
-          -> System.out.println(
-              "right connected=" + sample.value.connected + " stale=" + sample.value.stale));
+      left.status().subscribe(sample -> printStatus("left", sample.value));
+      right.status().subscribe(sample -> printStatus("right", sample.value));
       exoDevice.status().subscribe(sample
           -> System.out.println(
               "exo connected=" + sample.value.connected + " stale=" + sample.value.stale));
@@ -68,5 +62,15 @@ public final class Telemetry {
       sdk.start();
       sdk.runForever();
     }
+  }
+
+  private static void printPose(String label, long sequence, GloveHandPose hand) {
+    System.out.println(label + " sequence=" + sequence
+        + " thumb=" + hand.fingertips.get(GloveFinger.THUMB).position
+        + " index=" + hand.fingertips.get(GloveFinger.INDEX).position);
+  }
+
+  private static void printStatus(String label, GloveStatus status) {
+    System.out.println(label + " connected=" + status.connected + " stale=" + status.stale);
   }
 }

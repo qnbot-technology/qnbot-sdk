@@ -14,23 +14,18 @@ int main(int argc, char** argv) {
         std::uint8_t right = 60;
         double hold = 1.0;
         for (int index = 1; index < argc; ++index) {
-            const std::string argument = argv[index];
-            if (argument == "--port") {
-                port = example::require_value(argc, argv, index, argument);
-            } else if (argument == "--left") {
-                left = example::parse_strength(
-                    example::require_value(argc, argv, index, argument),
-                    argument);
-            } else if (argument == "--right") {
-                right = example::parse_strength(
-                    example::require_value(argc, argv, index, argument),
-                    argument);
-            } else if (argument == "--hold") {
-                hold = example::parse_seconds(
-                    example::require_value(argc, argv, index, argument));
-            } else {
-                throw std::invalid_argument("unknown argument: " + argument);
-            }
+            const auto [option, value] =
+                example::next_argument(argc, argv, index);
+            if (option == "--port")
+                port = value;
+            else if (option == "--left")
+                left = example::parse_strength(value, option);
+            else if (option == "--right")
+                right = example::parse_strength(value, option);
+            else if (option == "--hold")
+                hold = example::parse_seconds(value);
+            else
+                throw std::invalid_argument("unknown argument: " + option);
         }
         if (port.empty()) throw std::invalid_argument("--port is required");
 
