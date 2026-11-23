@@ -51,6 +51,16 @@ inline std::string require_value(int argc, char** argv, int& index,
     return value;
 }
 
+struct Argument {
+    std::string name;
+    std::string value;
+};
+
+inline Argument next_argument(int argc, char** argv, int& index) {
+    const std::string name = argv[index];
+    return Argument{name, require_value(argc, argv, index, name)};
+}
+
 inline double parse_positive_double(const std::string& text,
                                     const std::string& option,
                                     bool allow_zero = false) {

@@ -49,7 +49,7 @@ int main() {
         auto device = glove.device();
         const auto subscription = device.pose().subscribe(
             [](const qnbot::Sample<qnbot::GlovePose>& sample) {
-                const auto& fingertips = sample.value.payload.fingertip_local;
+                const auto& fingertips = sample.value.payload.hand->fingertips;
                 const auto& index = fingertips.at(qnbot::GloveFinger::index);
                 std::cout << "pose sequence=" << sample.sequence << ' ';
                 print_source_time(sample.source_time);

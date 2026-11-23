@@ -1,8 +1,15 @@
 from __future__ import annotations
 
-from qnbot_sdk import CompositeExoGloveConfig, Sdk, Side
+from qnbot_sdk import CompositeExoGloveConfig, Sample, Sdk, Side
 from qnbot_sdk.exo import ExoConfig
-from qnbot_sdk.glove import GloveConfig
+from qnbot_sdk.glove import GloveConfig, GlovePose
+
+
+def print_glove(label: str, sample: Sample[GlovePose]) -> None:
+    print(
+        f"{label} glove pose sequence={sample.sequence} "
+        f"fingertips={len(sample.value.payload.hand.fingertips)}"
+    )
 
 
 def main() -> None:
@@ -23,18 +30,8 @@ def main() -> None:
         left_glove_device = glove.device(side=Side.LEFT)
         right_glove_device = glove.device(side=Side.RIGHT)
         exo_device = exo.device()
-        left_glove_device.pose().subscribe(
-            lambda sample: print(
-                f"left glove pose sequence={sample.sequence} "
-                f"fingertips={len(sample.value.payload.fingertip_local)}"
-            )
-        )
-        right_glove_device.pose().subscribe(
-            lambda sample: print(
-                f"right glove pose sequence={sample.sequence} "
-                f"fingertips={len(sample.value.payload.fingertip_local)}"
-            )
-        )
+        left_glove_device.pose().subscribe(lambda sample: print_glove("left", sample))
+        right_glove_device.pose().subscribe(lambda sample: print_glove("right", sample))
         sdk.start()
         print(
             f"started Left Glove={left_glove_device.source_id} "

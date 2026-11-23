@@ -18,7 +18,7 @@ int main() {
             [](const qnbot::Sample<qnbot::GlovePose>& sample) {
                 std::cout << "pose sequence=" << sample.sequence
                           << " fingertips="
-                          << sample.value.payload.fingertip_local.size()
+                          << sample.value.payload.hand->fingertips.size()
                           << '\n';
             });
 

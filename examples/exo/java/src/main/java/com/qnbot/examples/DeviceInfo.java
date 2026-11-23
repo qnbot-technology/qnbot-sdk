@@ -26,9 +26,11 @@ public final class DeviceInfo {
                            .build();
     try (Sdk sdk = new Sdk(config, context, transport); Exo exo = sdk.exo()) {
       ExoDeviceInfo info = exo.device().getDeviceInfo();
-      System.out.println("product=" + info.product + " protocol=" + info.protocolVersion.major + "."
-          + info.protocolVersion.minor + " serial=" + info.serialNumber
-          + " hardware=" + info.hardwareName);
+      StringBuilder identity = new StringBuilder("product=" + info.product + " protocol="
+          + info.protocolVersion.major + "." + info.protocolVersion.minor);
+      if (info.serialNumber != null) identity.append(" serial=").append(info.serialNumber);
+      if (info.hardwareName != null) identity.append(" hardware=").append(info.hardwareName);
+      System.out.println(identity);
       System.out.println("firmware=" + info.firmware.platform + "." + info.firmware.revision + "."
           + info.firmware.feature + "." + info.firmware.build);
       System.out.println("encoders=" + info.components.encoders.available + "/"

@@ -33,16 +33,17 @@ public final class Imu {
       }
       // The payload carries a torso IMU and an optional extra IMU; print whichever is present.
       device.telemetry().subscribe(sample -> {
-        for (ExoImuState imu :
-            new ExoImuState[] {sample.value.payload.torsoImu, sample.value.payload.extraImu}) {
-          if (imu != null)
-            System.out.println("IMU sequence=" + sample.sequence + " acceleration="
-                + imu.accelerationMps2 + " angularVelocity=" + imu.angularVelocityRadS
-                + " quaternion=" + imu.orientationXyzw);
-        }
+        printImu(sample.sequence, sample.value.payload.torsoImu);
+        printImu(sample.sequence, sample.value.payload.extraImu);
       });
       exo.start();
       exo.runForever();
     }
+  }
+
+  private static void printImu(long sequence, ExoImuState imu) {
+    if (imu == null) return;
+    System.out.println("IMU sequence=" + sequence + " acceleration=" + imu.accelerationMps2
+        + " angularVelocity=" + imu.angularVelocityRadS + " quaternion=" + imu.orientationXyzw);
   }
 }

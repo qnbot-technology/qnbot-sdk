@@ -15,25 +15,19 @@ struct Options {
 Options parse_options(int argc, char** argv) {
     Options options;
     for (int index = 1; index < argc; ++index) {
-        const std::string argument = argv[index];
-        if (argument == "--port") {
-            options.port = example::require_value(argc, argv, index, argument);
-        } else if (argument == "--package-id") {
-            options.package_id =
-                example::require_value(argc, argv, index, argument);
-        } else {
-            throw std::invalid_argument("unknown argument: " + argument);
-        }
+        const auto [option, value] = example::next_argument(argc, argv, index);
+        if (option == "--port")
+            options.port = value;
+        else if (option == "--package-id")
+            options.package_id = value;
+        else
+            throw std::invalid_argument("unknown argument: " + option);
     }
-    if (options.port.empty()) {
-        throw std::invalid_argument("--port is required");
-    }
-    if (options.package_id.empty()) {
+    if (options.port.empty()) throw std::invalid_argument("--port is required");
+    if (options.package_id.empty())
         throw std::invalid_argument("--package-id is required");
-    }
     return options;
 }
-
 qnbot::SdkConfig make_config(const Options& options) {
     qnbot::SdkConfig config = example::composite_config(options.port);
 

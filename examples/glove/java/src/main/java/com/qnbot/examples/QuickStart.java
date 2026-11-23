@@ -8,6 +8,7 @@ import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
 import com.qnbot.sdk.glove.GloveFinger;
+import com.qnbot.sdk.glove.GloveHandPose;
 
 /**
  * Streams the automatically discovered glove's pose.
@@ -22,12 +23,17 @@ public final class QuickStart {
     SdkConfig config = SdkConfig.builder().device(GloveConfig.builder().build()).build();
     try (Sdk sdk = new Sdk(config, context, transport); Glove glove = sdk.glove()) {
       GloveDevice device = glove.device();
-      device.pose().subscribe(sample -> System.out.println("pose sequence=" + sample.sequence
-              + " thumb=" + sample.value.payload.fingertipLocal.get(GloveFinger.THUMB).position
-              + " index=" + sample.value.payload.fingertipLocal.get(GloveFinger.INDEX).position));
+      device.pose().subscribe(
+          sample -> printPose("pose", sample.sequence, sample.value.payload.hand));
       glove.start();
       System.out.println("running");
       glove.runForever();
     }
+  }
+
+  private static void printPose(String label, long sequence, GloveHandPose hand) {
+    System.out.println(label + " sequence=" + sequence
+        + " thumb=" + hand.fingertips.get(GloveFinger.THUMB).position
+        + " index=" + hand.fingertips.get(GloveFinger.INDEX).position);
   }
 }

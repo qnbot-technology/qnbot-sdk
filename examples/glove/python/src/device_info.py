@@ -24,9 +24,9 @@ def main() -> None:
         info = device.get_device_info()
         print(
             f"source={device.source_id} canonical_sn={info.canonical_sn} "
-            f"device_type={info.device_type or 'unknown'} model={info.model or 'unknown'} "
-            f"firmware_version={info.firmware_version or 'unknown'} hand={info.hand.value} "
-            f"hand_source={info.hand_source or 'unknown'} "
+            f"device_type={info.device_type} model={info.model} "
+            f"firmware_version={info.firmware_version} hand={info.hand.value} "
+            f"hand_source={info.hand_source} "
             f"transport_type={info.transport_type.value}"
         )
     finally:

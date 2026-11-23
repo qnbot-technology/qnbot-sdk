@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
             [](const qnbot::Sample<qnbot::GlovePose>& sample) {
                 std::cout << "left glove pose sequence=" << sample.sequence
                           << " fingers="
-                          << sample.value.payload.fingertip_local.size()
+                          << sample.value.payload.hand->fingertips.size()
                           << '\n';
             });
         const auto right_pose_subscription =
@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
                 [](const qnbot::Sample<qnbot::GlovePose>& sample) {
                     std::cout << "right glove pose sequence=" << sample.sequence
                               << " fingers="
-                              << sample.value.payload.fingertip_local.size()
+                              << sample.value.payload.hand->fingertips.size()
                               << '\n';
                 });
         const auto left_glove_status_subscription =

@@ -28,12 +28,12 @@ int main(int argc, char** argv) {
     try {
         std::string port;
         for (int index = 1; index < argc; ++index) {
-            const std::string argument = argv[index];
-            if (argument == "--port") {
-                port = example::require_value(argc, argv, index, argument);
-            } else {
-                throw std::invalid_argument("unknown argument: " + argument);
-            }
+            const auto [option, value] =
+                example::next_argument(argc, argv, index);
+            if (option == "--port")
+                port = value;
+            else
+                throw std::invalid_argument("unknown argument: " + option);
         }
         if (port.empty()) throw std::invalid_argument("--port is required");
 

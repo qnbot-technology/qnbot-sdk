@@ -16,7 +16,7 @@ int main() {
             [](const qnbot::Sample<qnbot::GlovePose>& sample) {
                 std::cout << "left glove pose sequence=" << sample.sequence
                           << " fingertips="
-                          << sample.value.payload.fingertip_local.size()
+                          << sample.value.payload.hand->fingertips.size()
                           << '\n';
             });
         const auto right_pose_subscription =
@@ -24,7 +24,7 @@ int main() {
                 [](const qnbot::Sample<qnbot::GlovePose>& sample) {
                     std::cout << "right glove pose sequence=" << sample.sequence
                               << " fingertips="
-                              << sample.value.payload.fingertip_local.size()
+                              << sample.value.payload.hand->fingertips.size()
                               << '\n';
                 });
         const auto telemetry_subscription = exo_device.telemetry().subscribe(

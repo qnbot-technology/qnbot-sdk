@@ -33,17 +33,12 @@ int main(int argc, char** argv) {
         auto glove = sdk.glove();
         auto device = glove.device();
         const auto info = device.get_device_info();
-        const auto display = [](const std::string& value) {
-            return value.empty() ? "unknown" : value;
-        };
         std::cout << "canonical_sn=" << info.canonical_sn
-                  << " device_type=" << display(info.device_type)
-                  << " model=" << display(info.model)
-                  << " firmware_version=" << display(info.firmware_version)
-                  << " hand="
+                  << " device_type=" << info.device_type
+                  << " model=" << info.model
+                  << " firmware_version=" << info.firmware_version << " hand="
                   << (info.hand == qnbot::Side::left ? "left" : "right")
-                  << " hand_source=" << display(info.hand_source)
-                  << " transport_type="
+                  << " hand_source=" << info.hand_source << " transport_type="
                   << qnbot::glove_transport_type_name(info.transport_type)
                   << std::endl;
         glove.close();
