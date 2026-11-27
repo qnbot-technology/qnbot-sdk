@@ -14,11 +14,11 @@ int main(int argc, char** argv) {
         auto subscription = device.emf().subscribe(
             [](const qnbot::Sample<qnbot::GloveEmf>& sample) {
                 const auto& payload = sample.value.payload;
-                if (payload.et) {
-                    std::cout << "emf ref_ms=" << payload.et->ref();
-                    if (auto error = payload.et->error())
+                if (payload.emf_time) {
+                    std::cout << "emf ref_ms=" << payload.emf_time->ref;
+                    if (auto error = payload.emf_time->error)
                         std::cout << " error_ms=" << *error;
-                    if (auto error = payload.et->b_error())
+                    if (auto error = payload.emf_time->b_error)
                         std::cout << " b_error_ms=" << *error;
                     std::cout << "\n";
                 }

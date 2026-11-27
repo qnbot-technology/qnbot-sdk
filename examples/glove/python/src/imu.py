@@ -16,7 +16,10 @@ def print_imu(sample: Sample[GloveImu]) -> None:
         if isinstance(imu.values, GloveImuRawCounts):
             values = f"raw_counts gyro={imu.values.gyroscope_raw} accel={imu.values.accelerometer_raw}"
         else:
-            values = f"gyro_mdps={imu.values.gyro_mdps} accel_mg={imu.values.accel_mg}"
+            values = (
+                f"angular_velocity_rad_s={imu.values.angular_velocity_rad_s} "
+                f"acceleration_mps2={imu.values.acceleration_mps2}"
+            )
         print(
             f"imu id={imu.id} location={imu.location.value} valid={imu.valid} fresh={imu.fresh} {values}"
         )
@@ -36,15 +39,19 @@ def print_pose(sample: Sample[GlovePose]) -> None:
     if wrist is None:
         print("wrist absent")
     else:
+        pose = wrist.pose
         print(
             f"wrist state={'fresh' if wrist.fresh else 'held'} valid={wrist.valid} "
             f"timestamp_ms={wrist.timestamp_ms} received_ms={wrist.received_monotonic_ms} "
-            f"position_m={wrist.position} quaternion_xyzw={wrist.quaternion_xyzw}"
+            f"position_m={pose.position if pose else None} "
+            f"quaternion_xyzw={pose.quaternion_xyzw if pose else None}"
         )
 
 
 def main() -> None:
-    arguments = argparse.ArgumentParser(description="Read glove IMU raw counts")
+    arguments = argparse.ArgumentParser(
+        description="Read glove IMU raw counts and physical measurements"
+    )
     arguments.add_argument(
         "--port", required=True, help="Serial port for the glove or wireless Receiver"
     )

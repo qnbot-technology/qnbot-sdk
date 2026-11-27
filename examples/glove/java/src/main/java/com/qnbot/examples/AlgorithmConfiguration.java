@@ -16,15 +16,17 @@ import com.qnbot.sdk.config.TargetConfig;
 import com.qnbot.sdk.glove.Glove;
 import com.qnbot.sdk.glove.GloveConfig;
 import com.qnbot.sdk.glove.GloveDevice;
+import com.qnbot.sdk.glove.calibration.CalibrationKeyInfo;
 import java.io.IOException;
+import java.nio.file.Path;
 
 /**
  * Prepares an algorithm package or bone configuration, then runs one configured target for a
- * fixed duration and prints retargeting output.
+ * fixed duration, prints retargeting output, and optionally exports the effective calibration key.
  *
  * <p>Supply the Android Context, authorized transport, explicit serial port, side and installed
- * package ID. Pass null algorithmConfigPath when the package uses its defaults; try-with-resources
- * closes the SDK after the timed run.
+ * package ID. Pass null for optional paths when using defaults; try-with-resources closes the SDK
+ * after the timed run.
  */
 public final class AlgorithmConfiguration {
   private AlgorithmConfiguration() {}
@@ -41,6 +43,17 @@ public final class AlgorithmConfiguration {
   public static void run(Context context, SerialTransport transport, String port, Side side,
       String packageId, BoneConfigMode boneConfigMode, String algorithmConfigPath, double seconds)
       throws InterruptedException {
+    run(context, transport, port, side, packageId, boneConfigMode, algorithmConfigPath, null, null,
+        seconds);
+  }
+
+  /**
+   * Runs the configured target with optional calibration-key replay and exports the active route's
+   * effective calibration key when {@code keyOutput} is supplied.
+   */
+  public static void run(Context context, SerialTransport transport, String port, Side side,
+      String packageId, BoneConfigMode boneConfigMode, String algorithmConfigPath,
+      String calibrationKeyPath, Path keyOutput, double seconds) throws InterruptedException {
     if (!Double.isFinite(seconds) || seconds <= 0) {
       throw new IllegalArgumentException("seconds must be positive and finite");
     }
@@ -54,8 +67,8 @@ public final class AlgorithmConfiguration {
                                        .name("configured_hand")
                                        .side(side)
                                        .source(new DeviceSelector("glove", "primary", side))
-                                       .algorithm(new TargetAlgorithm(
-                                           packageId, boneConfigMode, algorithmConfigPath))
+                                       .algorithm(new TargetAlgorithm(packageId, boneConfigMode,
+                                           algorithmConfigPath, calibrationKeyPath))
                                        .build())
                            .build();
     try (Sdk sdk = new Sdk(config, context, transport); Glove glove = sdk.glove()) {
@@ -68,6 +81,11 @@ public final class AlgorithmConfiguration {
       glove.runBackground();
       try {
         Thread.sleep((long) (seconds * 1_000));
+        if (keyOutput != null) {
+          CalibrationKeyInfo saved = device.exportCalibration(keyOutput, "configured_hand");
+          System.out.println(
+              "effective calibration key saved: " + saved.path + " sha256=" + saved.keySha256);
+        }
       } finally {
         glove.requestStop();
         glove.join();
