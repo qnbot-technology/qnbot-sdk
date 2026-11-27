@@ -50,6 +50,8 @@ cmake -S . -B build -G Ninja \
 cmake --build build --config Release
 ```
 
+构建 `imu` 和 `emf` 需要配套的 Core 和 Glove 包，SDK feature revision 至少为 5。
+
 多配置生成器的可执行文件通常位于 `build/Release/`，单配置 Ninja 通常位于 `build/`。
 
 ## 无硬件设备选择示例
@@ -200,7 +202,7 @@ USB 直连、Receiver 无线和左右手混合连接使用同一套配置。查�
 
 ## 多路 IMU 与原始 EMF
 
-使用 Glove 2.0.0 及后续正式版的配套 Core、Glove 包。IMU 示例输出逐通道原始值或带单位值；`emf` 输出原始 EMF 矩阵和通道信息。
+IMU 示例以 `angular_velocity_rad_s` 显示 Helix 角速度（rad/s），以 `acceleration_mps2` 显示加速度（m/s²），普通手套输出原始计数；缺失向量与有效零值分开显示。示例同时订阅手部和腕部位姿，分别显示 fresh/held、`timestamp_ms` 和 `received_ms`，腕部 `position_m` 使用米、`quaternion_xyzw` 按 x/y/z/w 排列。`emf` 输出原始 EMF 矩阵和通道信息，不需要目标手算法包。
 
 ```bash
 ./build/imu --port /dev/your-glove --side left

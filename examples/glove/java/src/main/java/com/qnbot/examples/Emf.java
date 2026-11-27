@@ -26,9 +26,9 @@ public final class Emf {
       GloveDevice device = glove.device();
       device.emf().subscribe(sample -> {
         com.qnbot.sdk.glove.GloveEmfPayload payload = sample.value.payload;
-        if (payload.et != null) {
-          System.out.println("EMF ref_ms=" + payload.et.ref()
-              + " error_ms=" + payload.et.error() + " b_error_ms=" + payload.et.bError());
+        if (payload.emfTime != null) {
+          System.out.println("EMF ref_ms=" + payload.emfTime.ref
+              + " error_ms=" + payload.emfTime.error + " b_error_ms=" + payload.emfTime.bError);
         }
         for (com.qnbot.sdk.glove.GloveEmfChannel channel : payload.channels) {
           System.out.println("EMF session=" + payload.session

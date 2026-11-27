@@ -8,9 +8,9 @@ from qnbot_sdk.glove import GloveConfig, GloveEmf
 
 def print_emf(sample: Sample[GloveEmf]) -> None:
     payload = sample.value.payload
-    if payload.et is not None:
+    if payload.emf_time is not None:
         print(
-            f"emf ref_ms={payload.et.ref} error_ms={payload.et.error} b_error_ms={payload.et.b_error}"
+            f"emf ref_ms={payload.emf_time.ref} error_ms={payload.emf_time.error} b_error_ms={payload.emf_time.b_error}"
         )
     for channel in payload.channels:
         print(

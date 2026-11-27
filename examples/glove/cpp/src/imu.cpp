@@ -24,19 +24,15 @@ void print_pose(const qnbot::Sample<qnbot::GlovePose>& sample) {
               << " valid=" << wrist->valid
               << " timestamp_ms=" << wrist->timestamp_ms
               << " received_ms=" << wrist->received_monotonic_ms;
-    if (wrist->position) {
-        const auto& p = *wrist->position;
+    if (wrist->pose) {
+        const auto& p = wrist->pose->position;
         std::cout << " position_m=[" << p[0] << "," << p[1] << "," << p[2]
                   << "]";
-    } else {
-        std::cout << " position_m=none";
-    }
-    if (wrist->quaternion_xyzw) {
-        const auto& q = *wrist->quaternion_xyzw;
+        const auto& q = wrist->pose->quaternion_xyzw;
         std::cout << " quaternion_xyzw=[" << q[0] << "," << q[1] << "," << q[2]
                   << "," << q[3] << "]";
     } else {
-        std::cout << " quaternion_xyzw=none";
+        std::cout << " position_m=none quaternion_xyzw=none";
     }
     std::cout << "\n";
 }
@@ -71,15 +67,20 @@ int main(int argc, char** argv) {
                         } else if (const auto* physical = std::get_if<
                                        qnbot::GloveImuPhysicalValues>(
                                        &imu.values)) {
-                            if (physical->gyro_mdps) {
-                                const auto& v = *physical->gyro_mdps;
-                                std::cout << " gyro_mdps=[" << v[0] << ","
-                                          << v[1] << "," << v[2] << "]";
+                            if (physical->angular_velocity_rad_s) {
+                                const auto& v =
+                                    *physical->angular_velocity_rad_s;
+                                std::cout << " angular_velocity_rad_s=[" << v[0]
+                                          << "," << v[1] << "," << v[2] << "]";
+                            } else {
+                                std::cout << " angular_velocity_rad_s=none";
                             }
-                            if (physical->accel_mg) {
-                                const auto& v = *physical->accel_mg;
-                                std::cout << " accel_mg=[" << v[0] << ","
-                                          << v[1] << "," << v[2] << "]";
+                            if (physical->acceleration_mps2) {
+                                const auto& v = *physical->acceleration_mps2;
+                                std::cout << " acceleration_mps2=[" << v[0]
+                                          << "," << v[1] << "," << v[2] << "]";
+                            } else {
+                                std::cout << " acceleration_mps2=none";
                             }
                         }
                         std::cout << "\n";

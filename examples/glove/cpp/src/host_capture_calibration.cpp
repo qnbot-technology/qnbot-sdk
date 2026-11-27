@@ -54,17 +54,42 @@ Options parse_options(int argc, char** argv) {
     return options;
 }
 
+bool is_builtin_skeleton_package_id(const std::string& package_id) {
+    std::string normalized;
+    bool in_token = false;
+    for (unsigned char ch : package_id) {
+        const bool is_alnum = (ch >= '0' && ch <= '9') ||
+                              (ch >= 'A' && ch <= 'Z') ||
+                              (ch >= 'a' && ch <= 'z');
+        if (is_alnum) {
+            if (!in_token && !normalized.empty()) normalized.push_back('-');
+            const char lower = (ch >= 'A' && ch <= 'Z')
+                                   ? static_cast<char>(ch - 'A' + 'a')
+                                   : static_cast<char>(ch);
+            normalized.push_back(lower);
+            in_token = true;
+        } else {
+            in_token = false;
+        }
+    }
+    return normalized == "qnbot-hand-dynamic-openxr-hand";
+}
+
 std::vector<ConfiguredTarget>
 configured_targets(const std::vector<std::string>& package_ids) {
     const auto ordinary_count = static_cast<std::size_t>(std::count_if(
         package_ids.begin(), package_ids.end(), [](const std::string& value) {
-            return value != builtin_skeleton_package_id;
+            return !is_builtin_skeleton_package_id(value);
         }));
     std::size_t ordinary_index = 0;
+    bool skeleton_added = false;
     std::vector<ConfiguredTarget> targets;
     for (const auto& package_id : package_ids) {
-        if (package_id == builtin_skeleton_package_id) {
-            targets.push_back({package_id, "skeleton"});
+        if (is_builtin_skeleton_package_id(package_id)) {
+            if (!skeleton_added) {
+                targets.push_back({package_id, "skeleton"});
+                skeleton_added = true;
+            }
             continue;
         }
         ++ordinary_index;
@@ -88,7 +113,7 @@ qnbot::SdkConfig make_config(const std::vector<std::string>& package_ids) {
     qnbot::SdkConfig config;
     config.devices = {left, right};
     for (const auto& target : configured_targets(package_ids)) {
-        if (target.package_id == builtin_skeleton_package_id) continue;
+        if (is_builtin_skeleton_package_id(target.package_id)) continue;
         for (const auto& side_and_source :
              {std::make_pair(qnbot::Side::left, left_source),
               std::make_pair(qnbot::Side::right, right_source)}) {
@@ -104,8 +129,7 @@ qnbot::SdkConfig make_config(const std::vector<std::string>& package_ids) {
     return config;
 }
 
-std::string select_target(const std::vector<std::string>& package_ids) {
-    const auto targets = configured_targets(package_ids);
+std::string select_target(const std::vector<ConfiguredTarget>& targets) {
     if (targets.size() == 1) return targets.front().name;
     for (std::size_t index = 0; index < targets.size(); ++index) {
         std::cout << index + 1 << ": " << targets[index].name << " ("
@@ -276,13 +300,13 @@ void calibrate(qnbot::GloveDevice& device, qnbot::Glove& glove,
 int main(int argc, char** argv) {
     try {
         const auto options = parse_options(argc, argv);
+        const auto configured = configured_targets(options.package_ids);
         qnbot::Sdk sdk(make_config(options.package_ids));
         auto glove = sdk.glove();
         auto left_device = glove.device(left_source);
         auto right_device = glove.device(right_source);
-        if (std::find(options.package_ids.begin(), options.package_ids.end(),
-                      builtin_skeleton_package_id) !=
-            options.package_ids.end()) {
+        if (std::any_of(options.package_ids.begin(), options.package_ids.end(),
+                        is_builtin_skeleton_package_id)) {
             static_cast<void>(left_device.skeleton());
             static_cast<void>(right_device.skeleton());
         }
@@ -296,7 +320,7 @@ int main(int argc, char** argv) {
         auto right_session = capture_side(right_device, glove,
                                           options.package_ids, options.force);
         const std::vector<std::optional<std::string>> targets{
-            select_target(left_session.snapshot().plan.package_ids)};
+            select_target(configured)};
         calibrate(left_device, glove, left_session, targets);
         calibrate(right_device, glove, right_session, targets);
 

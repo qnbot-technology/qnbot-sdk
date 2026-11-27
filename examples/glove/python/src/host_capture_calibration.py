@@ -31,15 +31,29 @@ BUILTIN_SKELETON_PACKAGE_ID = "qnbot_hand.dynamic_openxr_hand"
 WAIT_SECONDS = 300.0
 
 
+def is_builtin_skeleton_package_id(package_id: str) -> bool:
+    tokens = [
+        part.lower()
+        for part in "".join(
+            char if char.isascii() and char.isalnum() else "-" for char in package_id
+        ).split("-")
+        if part
+    ]
+    return "-".join(tokens) == "qnbot-hand-dynamic-openxr-hand"
+
+
 def configured_targets(package_ids: tuple[str, ...]) -> tuple[tuple[str, str], ...]:
     ordinary_count = sum(
-        package_id != BUILTIN_SKELETON_PACKAGE_ID for package_id in package_ids
+        not is_builtin_skeleton_package_id(package_id) for package_id in package_ids
     )
     ordinary_index = 0
+    skeleton_added = False
     targets: list[tuple[str, str]] = []
     for package_id in package_ids:
-        if package_id == BUILTIN_SKELETON_PACKAGE_ID:
-            targets.append((package_id, "skeleton"))
+        if is_builtin_skeleton_package_id(package_id):
+            if not skeleton_added:
+                targets.append((package_id, "skeleton"))
+                skeleton_added = True
             continue
         ordinary_index += 1
         name = TARGET_NAME if ordinary_count == 1 else f"{TARGET_NAME}_{ordinary_index}"
@@ -47,8 +61,7 @@ def configured_targets(package_ids: tuple[str, ...]) -> tuple[tuple[str, str], .
     return tuple(targets)
 
 
-def select_target(package_ids: tuple[str, ...]) -> str:
-    targets = configured_targets(package_ids)
+def select_target(targets: tuple[tuple[str, str], ...]) -> str:
     if len(targets) == 1:
         return targets[0][1]
     print("Select one configured target for Calibration:")
@@ -228,7 +241,7 @@ def main() -> None:
                 algorithms=(TargetAlgorithm(id=package_id),),
             )
             for package_id, target_name in configured
-            if package_id != BUILTIN_SKELETON_PACKAGE_ID
+            if not is_builtin_skeleton_package_id(package_id)
             for side, source in (
                 (Side.LEFT, LEFT_SOURCE),
                 (Side.RIGHT, RIGHT_SOURCE),
@@ -238,7 +251,7 @@ def main() -> None:
     glove = sdk.glove()
     left_device = glove.device(LEFT_SOURCE)
     right_device = glove.device(RIGHT_SOURCE)
-    if BUILTIN_SKELETON_PACKAGE_ID in package_ids:
+    if any(is_builtin_skeleton_package_id(package_id) for package_id in package_ids):
         left_device.skeleton()
         right_device.skeleton()
 
@@ -248,7 +261,7 @@ def main() -> None:
 
     left_session = capture_side(left_device, glove, package_ids, options.force)
     right_session = capture_side(right_device, glove, package_ids, options.force)
-    targets = (select_target(left_session.snapshot().plan.package_ids),)
+    targets = (select_target(configured),)
     calibrate(left_device, glove, left_session, targets)
     calibrate(right_device, glove, right_session, targets)
 

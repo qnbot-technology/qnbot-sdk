@@ -28,7 +28,7 @@ QuickStart.run(context, transport);
 
 | 用例 | Java 源码 | 其余参数 | 预期结果 |
 | --- | --- | --- | --- |
-| `glove/algorithm_configuration` | [AlgorithmConfiguration.java](src/main/java/com/qnbot/examples/AlgorithmConfiguration.java) | `port`、`side`、`packageId`、`boneConfigMode`、`algorithmConfigPath`、`seconds` | 使用骨长策略和算法参数读取目标输出 |
+| `glove/algorithm_configuration` | [AlgorithmConfiguration.java](src/main/java/com/qnbot/examples/AlgorithmConfiguration.java) | `port`、`side`、`packageId`、`boneConfigMode`、`algorithmConfigPath`、（可选 `calibrationKeyPath`、`keyOutput`、）`seconds` | 使用骨长策略、算法参数或标定钥匙读取目标输出，并可选导出生效标定钥匙 |
 | `glove/async_runtime` | [AsyncRuntime.java](src/main/java/com/qnbot/examples/AsyncRuntime.java) | `port`、`side`、`packageId`、`samples` | 一次异步读取和连续流消费，处理停止和清理 |
 | `glove/background_runtime` | [BackgroundRuntime.java](src/main/java/com/qnbot/examples/BackgroundRuntime.java) | `port`、`side`、`packageId`、`seconds` | 后台推进并持续读取目标输出 |
 | `glove/capture_quality` | [CaptureQuality.java](src/main/java/com/qnbot/examples/CaptureQuality.java) | `device`、`stage`、`collectWindow` | 先检测 close，再检测所选动作 |
@@ -70,7 +70,7 @@ QuickStart.run(context, transport);
 
 两个 `external_input` 示例由应用提供帧，因此也由应用决定采集交互。`captureConfig` 使用已有 `CaptureConfig`：`new CaptureConfig()` 保留 SDK 的 `AUTO_TERMINAL` 交互；普通 Android App 没有终端输入时显式选择 `EXTERNAL`，并填写所选 `operatorId`。`confirm` 是非阻塞 `Predicate<String>`：展示提示并读取已记录的 UI 输入，已确认返回 `true`，尚未输入返回 `false`，不要等待用户。`AUTO_TERMINAL` 不调用 `confirm`。`frames` 传 `null` 时使用文件内的合成五指帧；需要真实输入时传非阻塞 `Supplier<ExternalGloveFrame>`，返回五指帧或在输入结束时返回 `null`，时间戳每帧增加 10 毫秒。
 
-`algorithm_configuration` 的 `boneConfigMode` 使用 `AUTO`、`ENABLED` 或 `DISABLED`；`algorithmConfigPath` 传算法支持的可读配置文件路径，不指定时传 `null`。需要导入算法包时，在工作线程调用 `importAlgorithmArchive`，再调用 `run`。骨长准备和导出见产品文档与 CLI。
+`algorithm_configuration` 的 `boneConfigMode` 使用 `AUTO`、`ENABLED` 或 `DISABLED`；`algorithmConfigPath` 传算法支持的可读配置文件路径，不指定时传 `null`。传入 `calibrationKeyPath` 可直接回放已导出的完整标定钥匙，传入 `keyOutput` 可在产生有效输出后调用 `device.exportCalibration` 导出本次生效的标定钥匙。需要导入算法包时，在工作线程调用 `importAlgorithmArchive`，再调用 `run`。骨长准备和导出见产品文档与 CLI。
 
 `time_sync` 的 `referenceTimeMillis` 每次返回新的外部 Unix 毫秒时间；省略时使用 `System::currentTimeMillis`。输出 `reference_time_ms`、`source_time_ms` 和 `observed_at_ms`；源时间与观察时间基准不同，不能直接相减。需要包含 `Glove.syncTime` 的 Glove `2.0.0` 或后续正式版交付。
 

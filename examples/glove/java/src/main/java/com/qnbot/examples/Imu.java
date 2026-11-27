@@ -36,7 +36,7 @@ public final class Imu {
           } else {
             com.qnbot.sdk.glove.GloveImuValues.Physical physical =
                 (com.qnbot.sdk.glove.GloveImuValues.Physical) imu.values;
-            System.out.println("gyro_mdps=" + physical.gyroMdps + " accel_mg=" + physical.accelMg);
+            System.out.println("angular_velocity_rad_s=" + physical.angularVelocityRadS + " acceleration_mps2=" + physical.accelerationMps2);
           }
         }
       });

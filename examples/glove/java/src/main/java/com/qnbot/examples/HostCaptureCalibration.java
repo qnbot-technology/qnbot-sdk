@@ -50,6 +50,26 @@ import java.util.function.Predicate;
 public final class HostCaptureCalibration {
   private HostCaptureCalibration() {}
 
+  private static boolean isBuiltinSkeletonPackageId(String packageId) {
+    StringBuilder normalized = new StringBuilder();
+    boolean inToken = false;
+    for (int i = 0; i < packageId.length(); i++) {
+      char ch = packageId.charAt(i);
+      boolean isAlnum = (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z')
+          || (ch >= 'a' && ch <= 'z');
+      if (isAlnum) {
+        if (!inToken && normalized.length() > 0) {
+          normalized.append('-');
+        }
+        normalized.append(ch >= 'A' && ch <= 'Z' ? (char) (ch - 'A' + 'a') : ch);
+        inToken = true;
+      } else {
+        inToken = false;
+      }
+    }
+    return "qnbot-hand-dynamic-openxr-hand".equals(normalized.toString());
+  }
+
   /**
    * confirm must return promptly: true confirms the displayed action, false leaves it pending.
    * cancelled stops the current capture or calibration; both callbacks run on the caller thread.
@@ -61,16 +81,21 @@ public final class HostCaptureCalibration {
     List<String> packages =
         packageIds.isEmpty() ? List.of(builtin) : new ArrayList<>(new LinkedHashSet<>(packageIds));
     Map<String, String> targets = new LinkedHashMap<>();
-    int ordinary = (int) packages.stream().filter(id -> !id.equals(builtin)).count();
+    int ordinary = (int) packages.stream().filter(id -> !isBuiltinSkeletonPackageId(id)).count();
     int index = 0;
     for (String id : packages) {
-      targets.put(id, id.equals(builtin) ? "skeleton"
+      targets.put(id, isBuiltinSkeletonPackageId(id) ? "skeleton"
           : ordinary == 1 ? "openxr_hand" : "openxr_hand_" + (++index));
     }
     if (selectedPackageId == null && packages.size() == 1) {
       selectedPackageId = packages.get(0);
     }
     String selectedTarget = targets.get(selectedPackageId);
+    if (selectedTarget == null && selectedPackageId != null
+        && isBuiltinSkeletonPackageId(selectedPackageId)
+        && packages.stream().anyMatch(HostCaptureCalibration::isBuiltinSkeletonPackageId)) {
+      selectedTarget = "skeleton";
+    }
     if (selectedTarget == null) {
       throw new IllegalArgumentException("Select one configured package: " + packages);
     }
@@ -89,7 +114,7 @@ public final class HostCaptureCalibration {
                                                       : SerialConnection.port(rightPort))
                         .build());
     for (Map.Entry<String, String> target : targets.entrySet()) {
-      if (target.getKey().equals(builtin)) {
+      if (isBuiltinSkeletonPackageId(target.getKey())) {
         continue;
       }
       for (Side side : Side.values()) {
@@ -105,7 +130,7 @@ public final class HostCaptureCalibration {
     try (Sdk sdk = new Sdk(config.build(), context, transport); Glove glove = sdk.glove()) {
       GloveDevice left = glove.device("left");
       GloveDevice right = glove.device("right");
-      if (packages.contains(builtin)) {
+      if (packages.stream().anyMatch(HostCaptureCalibration::isBuiltinSkeletonPackageId)) {
         left.skeleton();
         right.skeleton();
       }
